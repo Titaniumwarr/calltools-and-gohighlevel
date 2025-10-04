@@ -12,5 +12,13 @@
       "database_name": "calltools-ghl-db",
       "database_id": "779f3bd6-38f3-42c2-9577-679663dc5d56"
     }
-  ]
+  ],
+  // Environment variables for API integrations
+  // Note: Set these via: wrangler secret put <SECRET_NAME>
+  "vars": {
+    "CALLTOOLS_BASE_URL": "https://api.calltools.com/v1"
+  }
+  // Secrets (set via wrangler secret put):
+  // - GHL_API_KEY: GoHighLevel API key
+  // - CALLTOOLS_API_KEY: CallTools API key
 }
