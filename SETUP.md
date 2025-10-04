@@ -5,6 +5,7 @@ This worker automatically syncs cold contacts from GoHighLevel to CallTools, exc
 ## Features
 
 - ✅ Automatically syncs cold contacts from GoHighLevel to CallTools
+- ✅ Adds contacts to "Cold Leads" bucket in CallTools for organized dialing
 - ✅ Excludes contacts marked as customers
 - ✅ Tracks sync status in a database
 - ✅ Prevents duplicate contacts
@@ -118,6 +119,8 @@ curl -X POST https://your-worker.workers.dev/sync/trigger
     "updated": 25,
     "excluded_customers": 5,
     "failed": 0,
+    "bucket_name": "Cold Leads",
+    "bucket_id": "bucket_12345",
     "errors": []
   }
 }
@@ -174,6 +177,7 @@ curl -X POST https://your-worker.workers.dev/sync/mark-customer/abc123
 The worker uses the following logic to determine which contacts to sync:
 
 #### ✅ Contacts that WILL be synced (Cold Contacts):
+- Contacts with the **"cold lead"** tag in GoHighLevel (primary match)
 - Contacts with tags containing: `cold`, `new lead`, `prospect`
 - Contacts without customer-related tags
 
@@ -181,16 +185,26 @@ The worker uses the following logic to determine which contacts to sync:
 - Contacts with tags containing: `customer`, `client`, `won`, `purchased`
 - Contacts manually marked as customers via the API
 
+### CallTools Bucket Organization
+
+All synced contacts are automatically added to the **"Cold Leads"** bucket in CallTools:
+- The bucket is created automatically if it doesn't exist
+- Contacts are added to this bucket during both creation and updates
+- This allows you to easily target cold leads in the CallTools dialer
+- You can configure campaigns and call flows specifically for this bucket
+
 ### Sync Process
 
-1. **Fetch Cold Contacts**: Retrieves all contacts from GoHighLevel with "cold" tags
-2. **Filter Out Customers**: Excludes contacts with customer-related tags
-3. **Check Existing Records**: Queries the database to see if contact was previously synced
-4. **Validate Phone Number**: Ensures contact has a valid phone number (required for CallTools)
-5. **Create or Update in CallTools**:
+1. **Get or Create Cold Leads Bucket**: Ensures the "Cold Leads" bucket exists in CallTools
+2. **Fetch Cold Contacts**: Retrieves all contacts from GoHighLevel with "cold lead" tag
+3. **Filter Out Customers**: Excludes contacts with customer-related tags
+4. **Check Existing Records**: Queries the database to see if contact was previously synced
+5. **Validate Phone Number**: Ensures contact has a valid phone number (required for CallTools)
+6. **Create or Update in CallTools**:
    - If contact doesn't exist in CallTools, create new
    - If contact exists, update their information
-6. **Track in Database**: Records sync status in the `synced_contacts` table
+7. **Add to Cold Leads Bucket**: Assigns contact to the "Cold Leads" bucket
+8. **Track in Database**: Records sync status in the `synced_contacts` table
 
 ### Database Schema
 

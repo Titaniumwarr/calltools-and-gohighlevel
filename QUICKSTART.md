@@ -62,14 +62,24 @@ curl -X POST https://your-worker.workers.dev/sync/mark-customer/CONTACT_ID
 ## What Gets Synced?
 
 ✅ **Synced Contacts:**
+- Contacts with **"cold lead"** tag in GoHighLevel
 - Contacts tagged with: `cold`, `new lead`, `prospect`
 - Contacts with valid phone numbers
 - Not marked as customers
+- **Automatically added to "Cold Leads" bucket in CallTools**
 
 ❌ **Excluded Contacts:**
 - Contacts tagged with: `customer`, `client`, `won`, `purchased`
 - Contacts without phone numbers
 - Contacts manually marked as customers
+
+### Cold Leads Bucket
+
+All synced contacts are automatically organized into a **"Cold Leads"** bucket in CallTools:
+- ✅ Automatically created if it doesn't exist
+- ✅ All cold contacts are added to this bucket
+- ✅ Easy to target in CallTools dialer campaigns
+- ✅ Keeps your cold outreach organized
 
 ## API Documentation
 

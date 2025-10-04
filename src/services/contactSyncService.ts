@@ -7,6 +7,8 @@ export interface SyncResult {
   updated: number;
   excluded_customers: number;
   failed: number;
+  bucket_name: string;
+  bucket_id: string | null;
   errors: Array<{
     contact_id: string;
     error: string;
@@ -49,16 +51,25 @@ export class ContactSyncService {
    * Main sync function - syncs cold contacts from GHL to CallTools
    */
   async syncColdContacts(): Promise<SyncResult> {
+    const bucketName = 'Cold Leads';
     const result: SyncResult = {
       total_processed: 0,
       synced: 0,
       updated: 0,
       excluded_customers: 0,
       failed: 0,
+      bucket_name: bucketName,
+      bucket_id: null,
       errors: [],
     };
 
     try {
+      // Get or create the "Cold Leads" bucket
+      console.log(`Getting or creating bucket: ${bucketName}`);
+      const bucketId = await this.callToolsClient.getOrCreateBucket(bucketName);
+      result.bucket_id = bucketId;
+      console.log(`Using bucket ID: ${bucketId}`);
+
       console.log('Fetching cold contacts from GoHighLevel...');
       const coldContacts = await this.ghlClient.getColdContactsExcludingCustomers();
       result.total_processed = coldContacts.length;
@@ -68,7 +79,7 @@ export class ContactSyncService {
       // Process each contact
       for (const ghlContact of coldContacts) {
         try {
-          await this.syncContact(ghlContact, result);
+          await this.syncContact(ghlContact, result, bucketId);
         } catch (error) {
           result.failed++;
           result.errors.push({
@@ -90,7 +101,7 @@ export class ContactSyncService {
   /**
    * Sync a single contact
    */
-  private async syncContact(ghlContact: GHLContact, result: SyncResult): Promise<void> {
+  private async syncContact(ghlContact: GHLContact, result: SyncResult, bucketId: string): Promise<void> {
     // Check if contact is already tracked in our database
     const existingRecord = await this.getSyncedContact(ghlContact.id);
 
@@ -118,6 +129,7 @@ export class ContactSyncService {
       phone_number: phone,
       email: ghlContact.email || '',
       external_id: ghlContact.id,
+      bucket_id: bucketId, // Assign to Cold Leads bucket
     };
 
     try {
@@ -133,6 +145,12 @@ export class ContactSyncService {
           callToolsContact
         );
         
+        // Ensure contact is in the Cold Leads bucket
+        await this.callToolsClient.addContactToBucket(
+          existingCallToolsContact.id,
+          bucketId
+        );
+        
         await this.updateSyncRecord(ghlContact.id, {
           calltools_contact_id: existingCallToolsContact.id,
           first_name: callToolsContact.first_name,
@@ -145,10 +163,16 @@ export class ContactSyncService {
         });
         
         result.updated++;
-        console.log(`Updated contact ${ghlContact.id} in CallTools`);
+        console.log(`Updated contact ${ghlContact.id} in CallTools and added to Cold Leads bucket`);
       } else {
         // Create new contact
         const createdContact = await this.callToolsClient.createContact(callToolsContact);
+        
+        // Add contact to the Cold Leads bucket
+        await this.callToolsClient.addContactToBucket(
+          createdContact.id,
+          bucketId
+        );
         
         await this.createOrUpdateSyncRecord({
           ghl_contact_id: ghlContact.id,
@@ -164,7 +188,7 @@ export class ContactSyncService {
         });
         
         result.synced++;
-        console.log(`Created contact ${ghlContact.id} in CallTools`);
+        console.log(`Created contact ${ghlContact.id} in CallTools and added to Cold Leads bucket`);
       }
     } catch (error) {
       await this.updateSyncRecord(ghlContact.id, {

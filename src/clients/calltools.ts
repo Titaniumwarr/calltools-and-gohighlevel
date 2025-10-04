@@ -9,6 +9,7 @@ export interface CallToolsContact {
   phone_number: string;
   email?: string;
   external_id?: string; // GoHighLevel contact ID
+  bucket_id?: string; // Bucket/List ID to add contact to
   custom_fields?: Record<string, any>;
 }
 
@@ -19,6 +20,7 @@ export interface CallToolsContactResponse {
   phone_number: string;
   email?: string;
   external_id?: string;
+  bucket_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -28,6 +30,20 @@ export interface CallToolsListResponse {
   total?: number;
   page?: number;
   per_page?: number;
+}
+
+export interface CallToolsBucket {
+  id: string;
+  name: string;
+  description?: string;
+  contact_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CallToolsBucketsResponse {
+  buckets: CallToolsBucket[];
+  total?: number;
 }
 
 export class CallToolsClient {
@@ -185,5 +201,121 @@ export class CallToolsClient {
     }
 
     return results;
+  }
+
+  /**
+   * Get all buckets/lists
+   */
+  async getBuckets(): Promise<CallToolsBucket[]> {
+    const response = await fetch(`${this.baseUrl}/buckets`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `CallTools API error: ${response.status} - ${errorText}`
+      );
+    }
+
+    const data: CallToolsBucketsResponse = await response.json();
+    return data.buckets || [];
+  }
+
+  /**
+   * Get or create a bucket by name
+   * Returns the bucket ID
+   */
+  async getOrCreateBucket(bucketName: string): Promise<string> {
+    try {
+      // First, try to get existing buckets
+      const buckets = await this.getBuckets();
+      const existingBucket = buckets.find(
+        (b) => b.name.toLowerCase() === bucketName.toLowerCase()
+      );
+
+      if (existingBucket) {
+        console.log(`Found existing bucket: ${bucketName} (${existingBucket.id})`);
+        return existingBucket.id;
+      }
+
+      // If bucket doesn't exist, create it
+      console.log(`Creating new bucket: ${bucketName}`);
+      const response = await fetch(`${this.baseUrl}/buckets`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: bucketName,
+          description: `Auto-created bucket for ${bucketName} contacts`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `CallTools API error: ${response.status} - ${errorText}`
+        );
+      }
+
+      const newBucket: CallToolsBucket = await response.json();
+      console.log(`Created bucket: ${bucketName} (${newBucket.id})`);
+      return newBucket.id;
+    } catch (error) {
+      console.error('Error getting/creating bucket:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a contact to a bucket
+   */
+  async addContactToBucket(contactId: string, bucketId: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/buckets/${bucketId}/contacts/${contactId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `CallTools API error: ${response.status} - ${errorText}`
+      );
+    }
+  }
+
+  /**
+   * Remove a contact from a bucket
+   */
+  async removeContactFromBucket(contactId: string, bucketId: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/buckets/${bucketId}/contacts/${contactId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `CallTools API error: ${response.status} - ${errorText}`
+      );
+    }
   }
 }

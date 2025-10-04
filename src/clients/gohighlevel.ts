@@ -80,7 +80,7 @@ export class GoHighLevelClient {
   }
 
   /**
-   * Get cold contacts (contacts with "cold" tag or in cold pipeline stage)
+   * Get cold contacts (contacts with "cold lead" tag)
    * Excluding customers (contacts with "customer" tag or in customer pipeline stage)
    */
   async getColdContactsExcludingCustomers(): Promise<GHLContact[]> {
@@ -120,8 +120,9 @@ export class GoHighLevelClient {
         return false;
       }
       
-      // Check if contact is in cold stage
+      // Check if contact has "cold lead" tag
       const isCold = tags.some(tag => 
+        tag === 'cold lead' ||
         tag.includes('cold') ||
         tag.includes('new lead') ||
         tag.includes('prospect')
