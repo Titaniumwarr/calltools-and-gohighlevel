@@ -64,7 +64,7 @@ export class CallToolsClient {
     const response = await fetch(`${this.baseUrl}/contacts`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Token ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(contact),
@@ -90,7 +90,7 @@ export class CallToolsClient {
     const response = await fetch(`${this.baseUrl}/contacts/${contactId}`, {
       method: 'PUT',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Token ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(contact),
@@ -116,7 +116,7 @@ export class CallToolsClient {
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': `Token ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
         }
@@ -147,7 +147,7 @@ export class CallToolsClient {
     const response = await fetch(`${this.baseUrl}/contacts/${contactId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Token ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
     });
@@ -210,7 +210,7 @@ export class CallToolsClient {
     const response = await fetch(`${this.baseUrl}/buckets`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Token ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
     });
@@ -248,7 +248,7 @@ export class CallToolsClient {
       const response = await fetch(`${this.baseUrl}/buckets`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -282,7 +282,7 @@ export class CallToolsClient {
       {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
       }
@@ -305,7 +305,7 @@ export class CallToolsClient {
       {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
       }
