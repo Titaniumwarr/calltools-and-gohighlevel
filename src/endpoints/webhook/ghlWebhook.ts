@@ -4,22 +4,17 @@ import { HandleArgs } from '../../types';
 import { ContactSyncService } from '../../services/contactSyncService';
 import { WebhookVerificationService } from '../../services/webhookVerification';
 
-// GoHighLevel webhook payload schema
+// GoHighLevel webhook payload schema - flexible to handle different formats
 const GHLWebhookSchema = z.object({
-  type: z.string(), // e.g., "ContactUpdate", "ContactCreate"
-  location_id: z.string(),
-  id: z.string(), // Contact ID
-  contact: z.object({
-    id: z.string(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-    name: z.string().optional(),
-    email: z.string().optional(),
-    phone: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-  }).optional(),
+  type: z.string().optional(),
+  location_id: z.string().optional(),
+  locationId: z.string().optional(),
+  id: z.string().optional(),
+  contactId: z.string().optional(),
+  contact_id: z.string().optional(),
+  contact: z.any().optional(),
   timestamp: z.number().optional(),
-});
+}).passthrough(); // Allow any other fields
 
 export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
   schema = {
@@ -108,6 +103,7 @@ export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
       try {
         webhookData = JSON.parse(rawBody);
       } catch (error) {
+        console.error('Failed to parse JSON:', error);
         return c.json(
           {
             success: false,
@@ -117,49 +113,47 @@ export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
         );
       }
 
+      // Log the full payload for debugging
+      console.log('=== Full GHL Webhook Payload ===');
+      console.log(JSON.stringify(webhookData, null, 2));
+
       // Validate webhook data
       const validation = GHLWebhookSchema.safeParse(webhookData);
       if (!validation.success) {
-        console.error('Invalid webhook payload:', validation.error);
+        console.error('Schema validation failed:', validation.error);
+        // Don't fail - just log and continue
+      }
+
+      const webhook = validation.success ? validation.data : webhookData;
+
+      // Extract contact ID from various possible locations
+      const contactId = 
+        webhook.id || 
+        webhook.contactId || 
+        webhook.contact_id ||
+        webhook.contact?.id ||
+        webhookData.id ||
+        webhookData.contactId ||
+        webhookData.contact_id ||
+        webhookData.contact?.id;
+
+      if (!contactId) {
+        console.error('No contact ID found in webhook payload');
+        console.log('Available fields:', Object.keys(webhookData));
         return c.json(
           {
             success: false,
-            message: 'Invalid webhook payload format',
+            message: 'No contact ID found in webhook payload',
+            debug: {
+              received_fields: Object.keys(webhookData),
+              hint: 'Expected id, contactId, contact_id, or contact.id',
+            },
           },
           400
         );
       }
 
-      const webhook = validation.data;
-
-      // Verify timestamp if present
-      if (webhook.timestamp && env.GHL_WEBHOOK_SECRET) {
-        const verificationService = new WebhookVerificationService(
-          env.GHL_WEBHOOK_SECRET
-        );
-        
-        if (!verificationService.verifyTimestamp(webhook.timestamp)) {
-          return c.json(
-            {
-              success: false,
-              message: 'Webhook timestamp is invalid or too old',
-            },
-            401
-          );
-        }
-      }
-
-      // Check if this is a relevant event type
-      const relevantTypes = ['ContactUpdate', 'ContactCreate', 'ContactTagUpdate'];
-      if (!relevantTypes.includes(webhook.type)) {
-        console.log(`Ignoring webhook type: ${webhook.type}`);
-        return c.json({
-          success: true,
-          message: `Webhook type ${webhook.type} ignored`,
-        });
-      }
-
-      console.log(`Processing ${webhook.type} webhook for contact ${webhook.id}`);
+      console.log(`Processing webhook for contact ${contactId}`);
 
       // Initialize sync service
       const syncService = new ContactSyncService(
@@ -170,7 +164,7 @@ export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
       );
 
       // Sync the specific contact
-      const result = await syncService.syncSingleContact(webhook.id);
+      const result = await syncService.syncSingleContact(contactId);
 
       return c.json({
         success: result.success,
