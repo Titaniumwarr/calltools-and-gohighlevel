@@ -7,6 +7,7 @@ declare namespace Cloudflare {
 		GHL_API_KEY: string;
 		CALLTOOLS_API_KEY: string;
 		CALLTOOLS_BASE_URL?: string;
+		GHL_WEBHOOK_SECRET?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

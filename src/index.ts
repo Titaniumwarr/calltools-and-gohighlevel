@@ -2,6 +2,7 @@ import { ApiException, fromHono } from "chanfana";
 import { Hono } from "hono";
 import { tasksRouter } from "./endpoints/tasks/router";
 import { syncRouter } from "./endpoints/sync/router";
+import { webhookRouter } from "./endpoints/webhook/router";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 import { DummyEndpoint } from "./endpoints/dummyEndpoint";
 
@@ -46,6 +47,9 @@ openapi.route("/tasks", tasksRouter);
 
 // Register Sync router
 openapi.route("/sync", syncRouter);
+
+// Register Webhook router
+openapi.route("/webhook", webhookRouter);
 
 // Register other endpoints
 openapi.post("/dummy/:slug", DummyEndpoint);

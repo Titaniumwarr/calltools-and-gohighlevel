@@ -2,6 +2,15 @@
 
 This is a quick reference to get your GoHighLevel to CallTools sync worker up and running fast.
 
+## ⚡ Sync Methods
+
+This worker supports **two sync methods**:
+
+1. **🎯 Webhooks (Recommended)** - Real-time sync when contacts are tagged
+2. **🔄 Batch Sync** - Manual or scheduled bulk sync
+
+**Best Practice:** Use both! Webhooks for speed + batch sync as backup.
+
 ## Prerequisites
 
 - GoHighLevel account with API access
@@ -33,6 +42,10 @@ wrangler secret put GHL_API_KEY
 # Set CallTools API key
 wrangler secret put CALLTOOLS_API_KEY
 # Paste your CallTools API key when prompted
+
+# Set webhook secret (for real-time sync)
+wrangler secret put GHL_WEBHOOK_SECRET
+# Generate and paste a secure random string (e.g., openssl rand -hex 32)
 ```
 
 ### 4. Deploy
@@ -44,7 +57,22 @@ npm run deploy
 
 Once deployed, you'll get a URL like: `https://your-worker.workers.dev`
 
-### Trigger a Sync
+### Option 1: Real-Time Webhook Sync (⚡ Recommended)
+
+**Set up in GoHighLevel:**
+1. Go to Settings → Integrations → Webhooks
+2. Add new webhook:
+   - URL: `https://your-worker.workers.dev/webhook/ghl`
+   - Secret: [Your GHL_WEBHOOK_SECRET]
+   - Events: Contact Created, Contact Updated, Contact Tag Added/Removed
+3. Save and test
+
+**Now contacts sync automatically when tagged "cold lead"!**
+
+📖 **Detailed Instructions:** [WEBHOOK_SETUP.md](./WEBHOOK_SETUP.md)
+
+### Option 2: Manual Batch Sync
+
 ```bash
 curl -X POST https://your-worker.workers.dev/sync/trigger
 ```

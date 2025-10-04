@@ -48,6 +48,97 @@ export class ContactSyncService {
   }
 
   /**
+   * Sync a single contact by ID from GoHighLevel
+   * Used for webhook-triggered syncs
+   */
+  async syncSingleContact(ghlContactId: string): Promise<{
+    success: boolean;
+    contact_id: string;
+    action: 'synced' | 'updated' | 'excluded' | 'failed';
+    bucket_id: string | null;
+    error?: string;
+  }> {
+    try {
+      // Get or create the "Cold Leads" bucket
+      const bucketId = await this.callToolsClient.getOrCreateBucket('Cold Leads');
+
+      // Fetch the specific contact from GoHighLevel
+      const ghlContact = await this.ghlClient.getContact(ghlContactId);
+
+      // Check if contact is a customer
+      const tags = (ghlContact.tags || []).map(t => t.toLowerCase());
+      const isCustomer = tags.some(tag => 
+        tag.includes('customer') || 
+        tag.includes('client') ||
+        tag.includes('won') ||
+        tag.includes('purchased')
+      );
+
+      if (isCustomer) {
+        // Mark as customer and exclude
+        await this.markAsCustomer(ghlContactId);
+        return {
+          success: true,
+          contact_id: ghlContactId,
+          action: 'excluded',
+          bucket_id: null,
+        };
+      }
+
+      // Check if contact has "cold lead" tag
+      const isCold = tags.some(tag => 
+        tag === 'cold lead' ||
+        tag.includes('cold') ||
+        tag.includes('new lead') ||
+        tag.includes('prospect')
+      );
+
+      if (!isCold) {
+        return {
+          success: true,
+          contact_id: ghlContactId,
+          action: 'excluded',
+          bucket_id: null,
+          error: 'Contact does not have cold lead tag',
+        };
+      }
+
+      // Sync the contact
+      const result: SyncResult = {
+        total_processed: 1,
+        synced: 0,
+        updated: 0,
+        excluded_customers: 0,
+        failed: 0,
+        bucket_name: 'Cold Leads',
+        bucket_id: bucketId,
+        errors: [],
+      };
+
+      await this.syncContact(ghlContact, result, bucketId);
+
+      const action = result.synced > 0 ? 'synced' : result.updated > 0 ? 'updated' : 'failed';
+
+      return {
+        success: result.failed === 0,
+        contact_id: ghlContactId,
+        action,
+        bucket_id: bucketId,
+        error: result.errors[0]?.error,
+      };
+    } catch (error) {
+      console.error(`Error syncing single contact ${ghlContactId}:`, error);
+      return {
+        success: false,
+        contact_id: ghlContactId,
+        action: 'failed',
+        bucket_id: null,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Main sync function - syncs cold contacts from GHL to CallTools
    */
   async syncColdContacts(): Promise<SyncResult> {
