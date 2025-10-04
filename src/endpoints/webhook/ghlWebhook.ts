@@ -68,38 +68,39 @@ export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
     try {
       const env = c.env;
 
-      // Verify webhook is enabled
-      if (!env.GHL_WEBHOOK_SECRET) {
-        console.warn('GHL_WEBHOOK_SECRET not configured, skipping signature verification');
-      }
-
-      // Get the raw body for signature verification
+      // Get the raw body
       const rawBody = await c.req.text();
       const signature = c.req.header('x-ghl-signature') || null;
 
       // Verify webhook signature if secret is configured
-      if (env.GHL_WEBHOOK_SECRET && signature) {
-        const verificationService = new WebhookVerificationService(
-          env.GHL_WEBHOOK_SECRET
-        );
-
-        const isValid = await verificationService.verifySignature(
-          rawBody,
-          signature
-        );
-
-        if (!isValid) {
-          console.error('Webhook signature verification failed');
-          return c.json(
-            {
-              success: false,
-              message: 'Invalid webhook signature',
-            },
-            401
+      if (env.GHL_WEBHOOK_SECRET) {
+        if (!signature) {
+          console.warn('GHL_WEBHOOK_SECRET is set but no signature received. Proceeding anyway...');
+        } else {
+          const verificationService = new WebhookVerificationService(
+            env.GHL_WEBHOOK_SECRET
           );
-        }
 
-        console.log('Webhook signature verified successfully');
+          const isValid = await verificationService.verifySignature(
+            rawBody,
+            signature
+          );
+
+          if (!isValid) {
+            console.error('Webhook signature verification failed');
+            return c.json(
+              {
+                success: false,
+                message: 'Invalid webhook signature',
+              },
+              401
+            );
+          }
+
+          console.log('Webhook signature verified successfully');
+        }
+      } else {
+        console.log('GHL_WEBHOOK_SECRET not configured, skipping signature verification');
       }
 
       // Parse the webhook payload
