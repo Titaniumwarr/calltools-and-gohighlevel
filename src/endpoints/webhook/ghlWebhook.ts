@@ -166,6 +166,8 @@ export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
       // Sync the specific contact, passing webhook data to avoid API call
       const result = await syncService.syncSingleContact(contactId, webhookData);
 
+      console.log(`Sync result for ${contactId}: ${result.action} (success: ${result.success})`);
+
       return c.json({
         success: result.success,
         message: result.success

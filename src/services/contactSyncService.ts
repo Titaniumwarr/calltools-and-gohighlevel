@@ -96,6 +96,7 @@ export class ContactSyncService {
 
       if (isCustomer) {
         // Mark as customer and exclude
+        console.log(`Contact ${ghlContactId} excluded: contains customer/client tags`);
         await this.markAsCustomer(ghlContactId);
         return {
           success: true,
@@ -114,6 +115,7 @@ export class ContactSyncService {
       );
 
       if (!isCold) {
+        console.log(`Contact ${ghlContactId} excluded: does not have cold lead tag`);
         return {
           success: true,
           contact_id: ghlContactId,
@@ -122,6 +124,8 @@ export class ContactSyncService {
           error: 'Contact does not have cold lead tag',
         };
       }
+
+      console.log(`Contact ${ghlContactId} is a cold lead, proceeding to sync to CallTools`);
 
       // Sync the contact
       const result: SyncResult = {
