@@ -244,7 +244,7 @@ export class ContactSyncService {
       email: ghlContact.email || '',
       external_id: ghlContact.id,
       bucket_id: bucketId, // Assign to Cold Leads bucket
-      tags: ['ACA Cold lead'], // Tag for identification
+      // Don't send tags in create payload - add them separately after creation
     };
 
     try {
