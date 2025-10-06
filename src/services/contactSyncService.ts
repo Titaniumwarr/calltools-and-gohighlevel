@@ -221,6 +221,7 @@ export class ContactSyncService {
       email: ghlContact.email || '',
       external_id: ghlContact.id,
       bucket_id: bucketId, // Assign to Cold Leads bucket
+      tags: ['ACA Cold lead'], // Tag for identification
     };
 
     try {
@@ -243,6 +244,12 @@ export class ContactSyncService {
             bucketId
           );
         }
+        
+        // Add ACA Cold lead tag
+        await this.callToolsClient.addTagToContact(
+          existingCallToolsContact.id,
+          'ACA Cold lead'
+        );
         
         await this.updateSyncRecord(ghlContact.id, {
           calltools_contact_id: existingCallToolsContact.id,
@@ -268,6 +275,12 @@ export class ContactSyncService {
             bucketId
           );
         }
+        
+        // Add ACA Cold lead tag
+        await this.callToolsClient.addTagToContact(
+          createdContact.id,
+          'ACA Cold lead'
+        );
         
         await this.createOrUpdateSyncRecord({
           ghl_contact_id: ghlContact.id,
