@@ -64,13 +64,15 @@ export class CallToolsClient {
     const url = `${this.baseUrl}/api/contacts/`;
     console.log(`Creating contact at: ${url}`);
     console.log(`Contact data:`, JSON.stringify(contact));
-    console.log(`Using API key (first 10 chars): ${this.apiKey.substring(0, 10)}...`);
-    console.log(`Auth header: Token ${this.apiKey.substring(0, 10)}...`);
+    console.log(`API key length: ${this.apiKey.length}`);
+    console.log(`API key (first 10 chars): ${this.apiKey.substring(0, 10)}...`);
+    console.log(`API key (last 10 chars): ...${this.apiKey.substring(this.apiKey.length - 10)}`);
     
+    // Try with Bearer token format first (some CallTools instances use this)
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${this.apiKey}`,
+        'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(contact),
@@ -122,12 +124,14 @@ export class CallToolsClient {
    */
   async getContactByExternalId(externalId: string): Promise<CallToolsContactResponse | null> {
     try {
+      console.log(`Checking for existing contact with external_id: ${externalId}`);
+      console.log(`API key length: ${this.apiKey.length}, first 10: ${this.apiKey.substring(0, 10)}...`);
       const response = await fetch(
         `${this.baseUrl}/api/contacts/?external_id=${encodeURIComponent(externalId)}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Token ${this.apiKey}`,
+            'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
         }
