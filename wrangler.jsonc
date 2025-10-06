@@ -2,6 +2,7 @@
   "compatibility_date": "2025-04-01",
   "main": "src/index.ts",
   "name": "calltools-and-gohighlevel",
+  "account_id": "042ae1c687d00b80aa7a1291a0ea4897",
   "upload_source_maps": true,
   "observability": {
     "enabled": true
