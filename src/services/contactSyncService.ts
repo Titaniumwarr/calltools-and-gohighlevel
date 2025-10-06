@@ -59,9 +59,9 @@ export class ContactSyncService {
     error?: string;
   }> {
     try {
-      // Skip bucket creation - endpoint not available on this CallTools instance
-      console.log('Skipping bucket creation (not available on this instance)');
-      const bucketId = null;
+      // Use the Cold Leads bucket ID
+      const bucketId = '11237';
+      console.log(`Using Cold Leads bucket ID: ${bucketId}`);
 
       // Use webhook data if provided, otherwise fetch from GoHighLevel
       let ghlContact: any;
@@ -179,10 +179,10 @@ export class ContactSyncService {
     };
 
     try {
-      // Skip bucket creation - endpoint not available on this CallTools instance
-      console.log(`Skipping bucket creation (not available on this instance)`);
-      const bucketId = null;
-      result.bucket_id = null;
+      // Use the Cold Leads bucket ID
+      const bucketId = '11237';
+      result.bucket_id = bucketId;
+      console.log(`Using Cold Leads bucket ID: ${bucketId}`);
 
       console.log('Fetching cold contacts from GoHighLevel...');
       const coldContacts = await this.ghlClient.getColdContactsExcludingCustomers();
@@ -260,12 +260,13 @@ export class ContactSyncService {
           callToolsContact
         );
         
-        // Skip bucket assignment (not available)
+        // Add contact to Cold Leads bucket
         if (bucketId) {
           await this.callToolsClient.addContactToBucket(
             existingCallToolsContact.id,
             bucketId
           );
+          console.log(`Added contact ${existingCallToolsContact.id} to bucket ${bucketId}`);
         }
         
         // Add ACA Cold lead tag
@@ -291,12 +292,13 @@ export class ContactSyncService {
         // Create new contact
         const createdContact = await this.callToolsClient.createContact(callToolsContact);
         
-        // Skip bucket assignment (not available)
+        // Add contact to Cold Leads bucket
         if (bucketId) {
           await this.callToolsClient.addContactToBucket(
             createdContact.id,
             bucketId
           );
+          console.log(`Added contact ${createdContact.id} to bucket ${bucketId}`);
         }
         
         // Add ACA Cold lead tag
