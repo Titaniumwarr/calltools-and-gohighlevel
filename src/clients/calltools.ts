@@ -61,7 +61,7 @@ export class CallToolsClient {
    * Create a new contact in CallTools
    */
   async createContact(contact: CallToolsContact): Promise<CallToolsContactResponse> {
-    const response = await fetch(`${this.baseUrl}/contacts`, {
+    const response = await fetch(`${this.baseUrl}/api/contacts/`, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${this.apiKey}`,
@@ -87,7 +87,7 @@ export class CallToolsClient {
     contactId: string,
     contact: Partial<CallToolsContact>
   ): Promise<CallToolsContactResponse> {
-    const response = await fetch(`${this.baseUrl}/contacts/${contactId}`, {
+    const response = await fetch(`${this.baseUrl}/api/contacts/${contactId}/`, {
       method: 'PUT',
       headers: {
         'Authorization': `Token ${this.apiKey}`,
@@ -112,7 +112,7 @@ export class CallToolsClient {
   async getContactByExternalId(externalId: string): Promise<CallToolsContactResponse | null> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/contacts?external_id=${encodeURIComponent(externalId)}`,
+        `${this.baseUrl}/api/contacts/?external_id=${encodeURIComponent(externalId)}`,
         {
           method: 'GET',
           headers: {
@@ -144,7 +144,7 @@ export class CallToolsClient {
    * Delete a contact from CallTools
    */
   async deleteContact(contactId: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/contacts/${contactId}`, {
+    const response = await fetch(`${this.baseUrl}/api/contacts/${contactId}/`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Token ${this.apiKey}`,
@@ -207,7 +207,7 @@ export class CallToolsClient {
    * Get all buckets/lists
    */
   async getBuckets(): Promise<CallToolsBucket[]> {
-    const response = await fetch(`${this.baseUrl}/buckets`, {
+    const response = await fetch(`${this.baseUrl}/api/lists/`, {
       method: 'GET',
       headers: {
         'Authorization': `Token ${this.apiKey}`,
@@ -245,7 +245,7 @@ export class CallToolsClient {
 
       // If bucket doesn't exist, create it
       console.log(`Creating new bucket: ${bucketName}`);
-      const response = await fetch(`${this.baseUrl}/buckets`, {
+      const response = await fetch(`${this.baseUrl}/api/lists/`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
@@ -278,7 +278,7 @@ export class CallToolsClient {
    */
   async addContactToBucket(contactId: string, bucketId: string): Promise<void> {
     const response = await fetch(
-      `${this.baseUrl}/buckets/${bucketId}/contacts/${contactId}`,
+      `${this.baseUrl}/api/lists/${bucketId}/contacts/${contactId}/`,
       {
         method: 'PUT',
         headers: {
@@ -301,7 +301,7 @@ export class CallToolsClient {
    */
   async removeContactFromBucket(contactId: string, bucketId: string): Promise<void> {
     const response = await fetch(
-      `${this.baseUrl}/buckets/${bucketId}/contacts/${contactId}`,
+      `${this.baseUrl}/api/lists/${bucketId}/contacts/${contactId}/`,
       {
         method: 'DELETE',
         headers: {
