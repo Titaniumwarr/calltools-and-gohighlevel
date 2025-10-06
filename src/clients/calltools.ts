@@ -68,11 +68,11 @@ export class CallToolsClient {
     console.log(`API key (first 10 chars): ${this.apiKey.substring(0, 10)}...`);
     console.log(`API key (last 10 chars): ...${this.apiKey.substring(this.apiKey.length - 10)}`);
     
-    // Try with Bearer token format first (some CallTools instances use this)
+    // Use Token format as per CallTools documentation
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Token ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(contact),
@@ -131,7 +131,7 @@ export class CallToolsClient {
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': `Token ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
         }
