@@ -59,8 +59,9 @@ export class ContactSyncService {
     error?: string;
   }> {
     try {
-      // Get or create the "Cold Leads" bucket
-      const bucketId = await this.callToolsClient.getOrCreateBucket('Cold Leads');
+      // Skip bucket creation for now - CallTools API endpoint not found
+      console.log('Skipping bucket creation (endpoint not available)');
+      const bucketId = null;
 
       // Fetch the specific contact from GoHighLevel
       const ghlContact = await this.ghlClient.getContact(ghlContactId);
@@ -115,7 +116,7 @@ export class ContactSyncService {
         errors: [],
       };
 
-      await this.syncContact(ghlContact, result, bucketId);
+      await this.syncContact(ghlContact, result, bucketId || '');
 
       const action = result.synced > 0 ? 'synced' : result.updated > 0 ? 'updated' : 'failed';
 
@@ -155,11 +156,9 @@ export class ContactSyncService {
     };
 
     try {
-      // Get or create the "Cold Leads" bucket
-      console.log(`Getting or creating bucket: ${bucketName}`);
-      const bucketId = await this.callToolsClient.getOrCreateBucket(bucketName);
-      result.bucket_id = bucketId;
-      console.log(`Using bucket ID: ${bucketId}`);
+      // Skip bucket creation for now - CallTools API endpoint not found
+      console.log(`Skipping bucket creation (endpoint not available)`);
+      const bucketId = null;
 
       console.log('Fetching cold contacts from GoHighLevel...');
       const coldContacts = await this.ghlClient.getColdContactsExcludingCustomers();
@@ -170,7 +169,7 @@ export class ContactSyncService {
       // Process each contact
       for (const ghlContact of coldContacts) {
         try {
-          await this.syncContact(ghlContact, result, bucketId);
+          await this.syncContact(ghlContact, result, bucketId || '');
         } catch (error) {
           result.failed++;
           result.errors.push({
@@ -236,11 +235,13 @@ export class ContactSyncService {
           callToolsContact
         );
         
-        // Ensure contact is in the Cold Leads bucket
-        await this.callToolsClient.addContactToBucket(
-          existingCallToolsContact.id,
-          bucketId
-        );
+        // Skip bucket assignment for now (endpoint not available)
+        if (bucketId) {
+          await this.callToolsClient.addContactToBucket(
+            existingCallToolsContact.id,
+            bucketId
+          );
+        }
         
         await this.updateSyncRecord(ghlContact.id, {
           calltools_contact_id: existingCallToolsContact.id,
@@ -259,11 +260,13 @@ export class ContactSyncService {
         // Create new contact
         const createdContact = await this.callToolsClient.createContact(callToolsContact);
         
-        // Add contact to the Cold Leads bucket
-        await this.callToolsClient.addContactToBucket(
-          createdContact.id,
-          bucketId
-        );
+        // Skip bucket assignment for now (endpoint not available)
+        if (bucketId) {
+          await this.callToolsClient.addContactToBucket(
+            createdContact.id,
+            bucketId
+          );
+        }
         
         await this.createOrUpdateSyncRecord({
           ghl_contact_id: ghlContact.id,
