@@ -51,10 +51,14 @@ export class CallToolsClient {
   private baseUrl: string = 'https://api.calltools.com/v1';
 
   constructor(apiKey: string, baseUrl?: string) {
+    if (!apiKey) {
+      throw new Error('CallTools API key is required but was not provided. Check CALLTOOLS_API_KEY environment variable.');
+    }
     this.apiKey = apiKey;
     if (baseUrl) {
       this.baseUrl = baseUrl;
     }
+    console.log(`CallTools client initialized with API key length: ${this.apiKey.length}`);
   }
 
   /**
