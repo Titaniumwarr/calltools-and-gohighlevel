@@ -64,6 +64,8 @@ export class CallToolsClient {
     const url = `${this.baseUrl}/api/contacts/`;
     console.log(`Creating contact at: ${url}`);
     console.log(`Contact data:`, JSON.stringify(contact));
+    console.log(`Using API key (first 10 chars): ${this.apiKey.substring(0, 10)}...`);
+    console.log(`Auth header: Token ${this.apiKey.substring(0, 10)}...`);
     
     const response = await fetch(url, {
       method: 'POST',
