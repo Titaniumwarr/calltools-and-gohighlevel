@@ -16,7 +16,7 @@
   // Environment variables for API integrations
   // Note: Set these via: wrangler secret put <SECRET_NAME>
   "vars": {
-    "CALLTOOLS_BASE_URL": "https://app.calltools.com/api"
+    "CALLTOOLS_BASE_URL": "https://app.calltools.com"
   }
   // Secrets (set via wrangler secret put):
   // - GHL_API_KEY: GoHighLevel API key
