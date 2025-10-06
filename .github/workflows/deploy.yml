@@ -32,3 +32,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: deploy
+          secrets: |
+            GHL_API_KEY
+            CALLTOOLS_API_KEY
+            GHL_LOCATION_ID
+        env:
+          GHL_API_KEY: ${{ secrets.GHL_API_KEY }}
+          CALLTOOLS_API_KEY: ${{ secrets.CALLTOOLS_API_KEY }}
+          GHL_LOCATION_ID: ${{ secrets.GHL_LOCATION_ID }}
