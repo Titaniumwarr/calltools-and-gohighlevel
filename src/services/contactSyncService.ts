@@ -115,7 +115,7 @@ export class ContactSyncService {
         errors: [],
       };
 
-      await this.syncContact(ghlContact, result, bucketId || '');
+      await this.syncContact(ghlContact, result, bucketId);
 
       const action = result.synced > 0 ? 'synced' : result.updated > 0 ? 'updated' : 'failed';
 
