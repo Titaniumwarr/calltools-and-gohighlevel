@@ -61,7 +61,11 @@ export class CallToolsClient {
    * Create a new contact in CallTools
    */
   async createContact(contact: CallToolsContact): Promise<CallToolsContactResponse> {
-    const response = await fetch(`${this.baseUrl}/api/contacts/`, {
+    const url = `${this.baseUrl}/api/contacts/`;
+    console.log(`Creating contact at: ${url}`);
+    console.log(`Contact data:`, JSON.stringify(contact));
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${this.apiKey}`,
@@ -70,14 +74,19 @@ export class CallToolsClient {
       body: JSON.stringify(contact),
     });
 
+    console.log(`Response status: ${response.status}`);
+    
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`CallTools API error: ${response.status} - ${errorText}`);
       throw new Error(
         `CallTools API error: ${response.status} - ${errorText}`
       );
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log(`Contact created successfully:`, JSON.stringify(result));
+    return result;
   }
 
   /**
