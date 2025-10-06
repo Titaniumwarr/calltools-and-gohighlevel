@@ -213,6 +213,35 @@ export class CallToolsClient {
   }
 
   /**
+   * Add a tag to a contact
+   * CallTools API: POST /api/contacts/{id}/tag/
+   */
+  async addTagToContact(contactId: string, tagName: string): Promise<void> {
+    const url = `${this.baseUrl}/api/contacts/${contactId}/tag/`;
+    console.log(`Adding tag "${tagName}" to contact ${contactId}`);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tag: tagName,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Failed to add tag: ${response.status} - ${errorText}`);
+      // Don't throw error - tagging failure shouldn't break the sync
+      console.warn(`Tag "${tagName}" could not be added, continuing anyway`);
+    } else {
+      console.log(`Tag "${tagName}" added successfully`);
+    }
+  }
+
+  /**
    * Get all buckets/lists
    */
   async getBuckets(): Promise<CallToolsBucket[]> {
