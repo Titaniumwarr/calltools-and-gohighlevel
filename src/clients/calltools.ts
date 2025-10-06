@@ -222,8 +222,8 @@ export class CallToolsClient {
       );
     }
 
-    const data: CallToolsBucketsResponse = await response.json();
-    return data.buckets || [];
+    const data: any = await response.json();
+    return data.results || [];
   }
 
   /**
@@ -245,7 +245,7 @@ export class CallToolsClient {
 
       // If bucket doesn't exist, create it
       console.log(`Creating new bucket: ${bucketName}`);
-      const response = await fetch(`${this.baseUrl}/api/lists/`, {
+      const response = await fetch(`${this.baseUrl}/api/buckets/`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
@@ -275,16 +275,20 @@ export class CallToolsClient {
 
   /**
    * Add a contact to a bucket
+   * CallTools uses PATCH with add_contacts array
    */
   async addContactToBucket(contactId: string, bucketId: string): Promise<void> {
     const response = await fetch(
-      `${this.baseUrl}/api/lists/${bucketId}/contacts/${contactId}/`,
+      `${this.baseUrl}/api/buckets/${bucketId}/`,
       {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          add_contacts: [parseInt(contactId)],
+        }),
       }
     );
 
@@ -298,16 +302,20 @@ export class CallToolsClient {
 
   /**
    * Remove a contact from a bucket
+   * CallTools uses PATCH with remove_contacts array
    */
   async removeContactFromBucket(contactId: string, bucketId: string): Promise<void> {
     const response = await fetch(
-      `${this.baseUrl}/api/lists/${bucketId}/contacts/${contactId}/`,
+      `${this.baseUrl}/api/buckets/${bucketId}/`,
       {
-        method: 'DELETE',
+        method: 'PATCH',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          remove_contacts: [parseInt(contactId)],
+        }),
       }
     );
 
