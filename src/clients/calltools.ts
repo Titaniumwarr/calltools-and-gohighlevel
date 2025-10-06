@@ -227,27 +227,75 @@ export class CallToolsClient {
    * CallTools API: POST /api/contacts/{id}/tag/
    */
   async addTagToContact(contactId: string, tagName: string): Promise<void> {
-    const url = `${this.baseUrl}/api/contacts/${contactId}/tag/`;
     console.log(`Adding tag "${tagName}" to contact ${contactId}`);
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        tag: tagName,
-      }),
-    });
+    try {
+      // Step 1: Find or create the tag
+      const searchUrl = `${this.baseUrl}/api/alltags/?name=${encodeURIComponent(tagName)}`;
+      const searchResponse = await fetch(searchUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Failed to add tag: ${response.status} - ${errorText}`);
+      if (!searchResponse.ok) {
+        throw new Error(`Failed to search for tag: ${searchResponse.status}`);
+      }
+
+      const searchData = await searchResponse.json();
+      let tagId: number;
+
+      if (searchData.results && searchData.results.length > 0) {
+        // Tag exists, use it
+        tagId = searchData.results[0].id;
+        console.log(`Found existing tag "${tagName}" with ID: ${tagId}`);
+      } else {
+        // Tag doesn't exist, create it
+        console.log(`Tag "${tagName}" not found, creating it...`);
+        const createResponse = await fetch(`${this.baseUrl}/api/alltags/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: tagName,
+          }),
+        });
+
+        if (!createResponse.ok) {
+          throw new Error(`Failed to create tag: ${createResponse.status}`);
+        }
+
+        const newTag = await createResponse.json();
+        tagId = newTag.id;
+        console.log(`Created new tag "${tagName}" with ID: ${tagId}`);
+      }
+
+      // Step 2: Add contact to the tag
+      const addResponse = await fetch(`${this.baseUrl}/api/alltags/${tagId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          add_contacts: [parseInt(contactId)],
+        }),
+      });
+
+      if (!addResponse.ok) {
+        const errorText = await addResponse.text();
+        throw new Error(`Failed to add contact to tag: ${addResponse.status} - ${errorText}`);
+      }
+
+      console.log(`Successfully added contact ${contactId} to tag "${tagName}"`);
+    } catch (error) {
+      console.error(`Error adding tag: ${error}`);
       // Don't throw error - tagging failure shouldn't break the sync
       console.warn(`Tag "${tagName}" could not be added, continuing anyway`);
-    } else {
-      console.log(`Tag "${tagName}" added successfully`);
     }
   }
 
