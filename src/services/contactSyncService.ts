@@ -51,7 +51,7 @@ export class ContactSyncService {
    * Sync a single contact by ID from GoHighLevel
    * Used for webhook-triggered syncs
    */
-  async syncSingleContact(ghlContactId: string): Promise<{
+  async syncSingleContact(ghlContactId: string, webhookContactData?: any): Promise<{
     success: boolean;
     contact_id: string;
     action: 'synced' | 'updated' | 'excluded' | 'failed';
@@ -63,11 +63,30 @@ export class ContactSyncService {
       console.log('Skipping bucket creation (not available on this instance)');
       const bucketId = null;
 
-      // Fetch the specific contact from GoHighLevel
-      const ghlContact = await this.ghlClient.getContact(ghlContactId);
+      // Use webhook data if provided, otherwise fetch from GoHighLevel
+      let ghlContact: any;
+      if (webhookContactData) {
+        console.log('Using contact data from webhook (avoiding API call)');
+        // Transform webhook data to GHLContact format
+        ghlContact = {
+          id: webhookContactData.contact_id,
+          firstName: webhookContactData.first_name,
+          lastName: webhookContactData.last_name,
+          name: webhookContactData.full_name,
+          email: webhookContactData.email,
+          phone: webhookContactData.phone,
+          tags: webhookContactData.tags ? webhookContactData.tags.split(',') : [],
+          contact_type: webhookContactData.contact_type,
+        };
+      } else {
+        console.log('Fetching contact from GoHighLevel API');
+        ghlContact = await this.ghlClient.getContact(ghlContactId);
+      }
 
       // Check if contact is a customer
-      const tags = (ghlContact.tags || []).map(t => t.toLowerCase());
+      const tags = Array.isArray(ghlContact.tags) 
+        ? (ghlContact.tags || []).map((t: string) => t.toLowerCase())
+        : [];
       const isCustomer = tags.some(tag => 
         tag.includes('customer') || 
         tag.includes('client') ||
