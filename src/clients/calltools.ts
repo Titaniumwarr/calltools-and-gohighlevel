@@ -124,14 +124,25 @@ export class CallToolsClient {
   }
 
   /**
-   * Get a contact by external ID (GoHighLevel ID)
+   * Get a contact by phone number
+   * CallTools API doesn't support external_id search, so we search by phone
    */
-  async getContactByExternalId(externalId: string): Promise<CallToolsContactResponse | null> {
+  async getContactByExternalId(externalId: string, phoneNumber?: string): Promise<CallToolsContactResponse | null> {
     try {
-      console.log(`Checking for existing contact with external_id: ${externalId}`);
-      console.log(`API key length: ${this.apiKey.length}, first 10: ${this.apiKey.substring(0, 10)}...`);
+      // CallTools doesn't support external_id search, we must search by phone number
+      if (!phoneNumber) {
+        console.log(`No phone number provided, cannot search for contact`);
+        return null;
+      }
+
+      console.log(`Searching for contact by phone: ${phoneNumber}`);
+      
+      // Clean phone number (remove +, spaces, dashes)
+      const cleanPhone = phoneNumber.replace(/[\+\s\-\(\)]/g, '');
+      console.log(`Cleaned phone number: ${cleanPhone}`);
+      
       const response = await fetch(
-        `${this.baseUrl}/api/contacts/?external_id=${encodeURIComponent(externalId)}`,
+        `${this.baseUrl}/api/contacts/?search=${encodeURIComponent(cleanPhone)}`,
         {
           method: 'GET',
           headers: {
@@ -143,7 +154,7 @@ export class CallToolsClient {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log(`No contact found with external_id: ${externalId} (404)`);
+          console.log(`No contact found with phone: ${phoneNumber} (404)`);
           return null;
         }
         const errorText = await response.text();
@@ -153,22 +164,19 @@ export class CallToolsClient {
       }
 
       const data: any = await response.json();
-      console.log(`API response structure:`, JSON.stringify(data).substring(0, 500));
-      console.log(`Full API response:`, JSON.stringify(data));
-      
-      // CallTools API returns 'results' array, not 'contacts'
       const contacts = data.results || data.contacts || [];
-      console.log(`Number of contacts found: ${contacts.length}`);
+      console.log(`Found ${contacts.length} contacts matching phone ${phoneNumber}`);
       
       if (contacts.length > 0) {
-        console.log(`Found existing contact: ID ${contacts[0].id}, external_id: ${contacts[0].external_id}`);
+        // Return the first match
+        console.log(`Found existing contact: ID ${contacts[0].id}, phone: ${phoneNumber}`);
         return contacts[0];
       } else {
-        console.log(`No contact found with external_id: ${externalId} (empty results)`);
+        console.log(`No contact found with phone: ${phoneNumber}`);
         return null;
       }
     } catch (error) {
-      console.error('Error fetching contact by external ID:', error);
+      console.error('Error fetching contact by phone:', error);
       return null;
     }
   }

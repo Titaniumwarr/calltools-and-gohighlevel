@@ -217,9 +217,10 @@ export class ContactSyncService {
         bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
       };
 
-      // Check if contact already exists in CallTools
+      // Check if contact already exists in CallTools (search by phone)
       const existingCallToolsContact = await this.callToolsClient.getContactByExternalId(
-        ghlContact.id
+        ghlContact.id,
+        phone
       );
 
       if (existingCallToolsContact) {
@@ -432,9 +433,10 @@ export class ContactSyncService {
     };
 
     try {
-      // Check if contact already exists in CallTools
+      // Check if contact already exists in CallTools (search by phone)
       const existingCallToolsContact = await this.callToolsClient.getContactByExternalId(
-        ghlContact.id
+        ghlContact.id,
+        phone
       );
 
       if (existingCallToolsContact) {
