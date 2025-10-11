@@ -424,54 +424,60 @@ export class CallToolsClient {
   }
 
   /**
-   * Add a tag to a contact
-   */
-  async addTagToContact(contactId: string, tagName: string): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/api/contacts/${contactId}/tags/`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ tag: tagName }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `CallTools API error: ${response.status} - ${errorText}`
-      );
-    }
-  }
-
-  /**
    * Remove a tag from a contact
+   * CallTools API: PATCH /api/alltags/{tagId}/ with remove_contacts
    */
   async removeTagFromContact(contactId: string, tagName: string): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/api/contacts/${contactId}/tags/${encodeURIComponent(tagName)}/`,
-      {
-        method: 'DELETE',
+    console.log(`Removing tag "${tagName}" from contact ${contactId}`);
+    
+    try {
+      // Step 1: Find the tag
+      const searchUrl = `${this.baseUrl}/api/alltags/?name=${encodeURIComponent(tagName)}`;
+      const searchResponse = await fetch(searchUrl, {
+        method: 'GET',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-      }
-    );
+      });
 
-    if (!response.ok) {
-      // If tag doesn't exist, consider it a success
-      if (response.status === 404) {
-        console.log(`Tag "${tagName}" not found on contact ${contactId}, skipping removal`);
+      if (!searchResponse.ok) {
+        throw new Error(`Failed to search for tag: ${searchResponse.status}`);
+      }
+
+      const searchData = await searchResponse.json();
+
+      if (!searchData.results || searchData.results.length === 0) {
+        // Tag doesn't exist, nothing to remove
+        console.log(`Tag "${tagName}" not found, nothing to remove`);
         return;
       }
-      const errorText = await response.text();
-      throw new Error(
-        `CallTools API error: ${response.status} - ${errorText}`
-      );
+
+      const tagId = searchData.results[0].id;
+      console.log(`Found tag "${tagName}" with ID: ${tagId}`);
+
+      // Step 2: Remove contact from the tag
+      const removeResponse = await fetch(`${this.baseUrl}/api/alltags/${tagId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          remove_contacts: [parseInt(contactId)],
+        }),
+      });
+
+      if (!removeResponse.ok) {
+        const errorText = await removeResponse.text();
+        throw new Error(`Failed to remove contact from tag: ${removeResponse.status} - ${errorText}`);
+      }
+
+      console.log(`Successfully removed contact ${contactId} from tag "${tagName}"`);
+    } catch (error) {
+      console.error(`Error removing tag: ${error}`);
+      // Don't throw error - tag removal failure shouldn't break the sync
+      console.warn(`Tag "${tagName}" could not be removed, continuing anyway`);
     }
   }
 }
