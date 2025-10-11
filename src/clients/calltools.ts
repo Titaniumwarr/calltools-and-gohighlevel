@@ -312,6 +312,10 @@ export class CallToolsClient {
       }
 
       // Step 2: Add contact to the tag
+      const contactIdNum = parseInt(contactId);
+      console.log(`Attempting to add contact ${contactIdNum} to tag ${tagId} ("${tagName}")`);
+      console.log(`Request body: ${JSON.stringify({ add_contacts: [contactIdNum] })}`);
+      
       const addResponse = await fetch(`${this.baseUrl}/api/alltags/${tagId}/`, {
         method: 'PATCH',
         headers: {
@@ -319,15 +323,18 @@ export class CallToolsClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          add_contacts: [parseInt(contactId)],
+          add_contacts: [contactIdNum],
         }),
       });
 
       if (!addResponse.ok) {
         const errorText = await addResponse.text();
+        console.error(`Failed to add contact to tag: ${addResponse.status} - ${errorText}`);
         throw new Error(`Failed to add contact to tag: ${addResponse.status} - ${errorText}`);
       }
 
+      const addResult = await addResponse.json();
+      console.log(`Tag PATCH response: ${JSON.stringify(addResult)}`);
       console.log(`Successfully added contact ${contactId} to tag "${tagName}"`);
     } catch (error) {
       console.error(`Error adding tag: ${error}`);
@@ -494,6 +501,10 @@ export class CallToolsClient {
       console.log(`Found tag "${tagName}" with ID: ${tagId}`);
 
       // Step 2: Remove contact from the tag
+      const contactIdNum = parseInt(contactId);
+      console.log(`Attempting to remove contact ${contactIdNum} from tag ${tagId} ("${tagName}")`);
+      console.log(`Request body: ${JSON.stringify({ remove_contacts: [contactIdNum] })}`);
+      
       const removeResponse = await fetch(`${this.baseUrl}/api/alltags/${tagId}/`, {
         method: 'PATCH',
         headers: {
@@ -501,15 +512,18 @@ export class CallToolsClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          remove_contacts: [parseInt(contactId)],
+          remove_contacts: [contactIdNum],
         }),
       });
 
       if (!removeResponse.ok) {
         const errorText = await removeResponse.text();
+        console.error(`Failed to remove contact from tag: ${removeResponse.status} - ${errorText}`);
         throw new Error(`Failed to remove contact from tag: ${removeResponse.status} - ${errorText}`);
       }
 
+      const removeResult = await removeResponse.json();
+      console.log(`Tag PATCH response: ${JSON.stringify(removeResult)}`);
       console.log(`Successfully removed contact ${contactId} from tag "${tagName}"`);
     } catch (error) {
       console.error(`Error removing tag: ${error}`);
