@@ -137,12 +137,13 @@ export class CallToolsClient {
 
       console.log(`Searching for contact by phone: ${phoneNumber}`);
       
-      // Clean phone number (remove +, spaces, dashes)
+      // Clean phone number (remove +, spaces, dashes, parentheses)
       const cleanPhone = phoneNumber.replace(/[\+\s\-\(\)]/g, '');
       console.log(`Cleaned phone number: ${cleanPhone}`);
       
+      // Use phone_number parameter for exact matching
       const response = await fetch(
-        `${this.baseUrl}/api/contacts/?search=${encodeURIComponent(cleanPhone)}`,
+        `${this.baseUrl}/api/contacts/?phone_number=${encodeURIComponent(cleanPhone)}`,
         {
           method: 'GET',
           headers: {
