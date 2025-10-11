@@ -139,13 +139,25 @@ export class CallToolsClient {
 
       console.log(`Searching for contact by phone: ${phoneNumber}`);
       
-      // Clean phone number (remove +, spaces, dashes, parentheses)
-      const cleanPhone = phoneNumber.replace(/[\+\s\-\(\)]/g, '');
-      console.log(`Searching with phone_number parameter: ${cleanPhone}`);
+      // Try to match the format stored in CallTools (_phone_numbers array)
+      // CallTools stores phone numbers in E.164 format with + prefix
+      let searchPhone = phoneNumber;
+      if (!searchPhone.startsWith('+')) {
+        // If no country code, assume US (+1)
+        const digitsOnly = searchPhone.replace(/[\s\-\(\)]/g, '');
+        if (digitsOnly.length === 10) {
+          searchPhone = `+1${digitsOnly}`;
+        } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+          searchPhone = `+${digitsOnly}`;
+        } else {
+          searchPhone = `+${digitsOnly}`;
+        }
+      }
+      console.log(`Searching with phone_number parameter: ${searchPhone}`);
       
       // Use phone_number query parameter (documented in CallTools API)
       const response = await fetch(
-        `${this.baseUrl}/api/contacts/?phone_number=${encodeURIComponent(cleanPhone)}`,
+        `${this.baseUrl}/api/contacts/?phone_number=${encodeURIComponent(searchPhone)}`,
         {
           method: 'GET',
           headers: {
