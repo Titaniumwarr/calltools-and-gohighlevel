@@ -6,9 +6,9 @@
 export interface CallToolsContact {
   first_name: string;
   last_name?: string;
-  phone_number: string;
+  mobile_phone_number?: string; // Primary phone field in CallTools
   email?: string;
-  external_id?: string; // GoHighLevel contact ID
+  personal_email_address?: string; // CallTools email field
   bucket_id?: string; // Bucket/List ID to add contact to
   custom_fields?: Record<string, any>;
 }
@@ -17,9 +17,11 @@ export interface CallToolsContactResponse {
   id: string;
   first_name: string;
   last_name?: string;
-  phone_number: string;
+  mobile_phone_number?: string;
+  home_phone_number?: string;
+  office_phone_number?: string;
+  personal_email_address?: string;
   email?: string;
-  external_id?: string;
   bucket_id?: string;
   created_at?: string;
   updated_at?: string;
@@ -137,13 +139,13 @@ export class CallToolsClient {
 
       console.log(`Searching for contact by phone: ${phoneNumber}`);
       
-      // Clean phone number (remove +, spaces, dashes, parentheses)
+      // Try searching with the search parameter (searches across all contact fields)
+      // This is more reliable than phone_number which may not work as expected
       const cleanPhone = phoneNumber.replace(/[\+\s\-\(\)]/g, '');
-      console.log(`Cleaned phone number: ${cleanPhone}`);
+      console.log(`Using search term: ${cleanPhone}`);
       
-      // Use phone_number parameter for exact matching
       const response = await fetch(
-        `${this.baseUrl}/api/contacts/?phone_number=${encodeURIComponent(cleanPhone)}`,
+        `${this.baseUrl}/api/contacts/?search=${encodeURIComponent(cleanPhone)}`,
         {
           method: 'GET',
           headers: {
@@ -166,12 +168,20 @@ export class CallToolsClient {
 
       const data: any = await response.json();
       const contacts = data.results || data.contacts || [];
-      console.log(`Found ${contacts.length} contacts matching phone ${phoneNumber}`);
+      console.log(`Search returned ${contacts.length} contacts`);
       
       if (contacts.length > 0) {
-        // Return the first match
-        console.log(`Found existing contact: ID ${contacts[0].id}, phone: ${phoneNumber}`);
-        return contacts[0];
+        // Find contact that matches this phone number
+        for (const contact of contacts) {
+          const contactPhone = contact.mobile_phone_number || contact.home_phone_number || contact.office_phone_number || '';
+          const contactPhoneClean = contactPhone.replace(/[\+\s\-\(\)]/g, '');
+          if (contactPhoneClean === cleanPhone) {
+            console.log(`Found matching contact: ID ${contact.id}, phone: ${contactPhone}`);
+            return contact;
+          }
+        }
+        console.log(`No exact phone match found in ${contacts.length} search results`);
+        return null;
       } else {
         console.log(`No contact found with phone: ${phoneNumber}`);
         return null;

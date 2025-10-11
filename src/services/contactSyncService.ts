@@ -211,9 +211,8 @@ export class ContactSyncService {
       const callToolsContact: CallToolsContact = {
         first_name: ghlContact.firstName || ghlContact.name || 'Unknown',
         last_name: ghlContact.lastName || '',
-        phone_number: phone,
-        email: ghlContact.email || '',
-        external_id: ghlContact.id,
+        mobile_phone_number: phone,
+        personal_email_address: ghlContact.email || '',
         bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
       };
 
@@ -273,7 +272,7 @@ export class ContactSyncService {
           calltools_contact_id: existingCallToolsContact.id,
           first_name: callToolsContact.first_name,
           last_name: callToolsContact.last_name,
-          phone: callToolsContact.phone_number,
+          phone: callToolsContact.mobile_phone_number,
           email: callToolsContact.email,
           sync_status: 'synced',
           last_sync_at: new Date().toISOString(),
@@ -318,7 +317,7 @@ export class ContactSyncService {
           calltools_contact_id: createdContact.id,
           first_name: callToolsContact.first_name,
           last_name: callToolsContact.last_name || null,
-          phone: callToolsContact.phone_number,
+          phone: callToolsContact.mobile_phone_number,
           email: callToolsContact.email || null,
           sync_status: 'synced',
           last_sync_at: new Date().toISOString(),
@@ -425,9 +424,8 @@ export class ContactSyncService {
     const callToolsContact: CallToolsContact = {
       first_name: ghlContact.firstName || ghlContact.name || 'Unknown',
       last_name: ghlContact.lastName || '',
-      phone_number: phone,
-      email: ghlContact.email || '',
-      external_id: ghlContact.id,
+      mobile_phone_number: phone,
+      personal_email_address: ghlContact.email || '',
       bucket_id: bucketId, // Assign to Cold Leads bucket
       // Don't send tags in create payload - add them separately after creation
     };
@@ -465,7 +463,7 @@ export class ContactSyncService {
           calltools_contact_id: existingCallToolsContact.id,
           first_name: callToolsContact.first_name,
           last_name: callToolsContact.last_name,
-          phone: callToolsContact.phone_number,
+          phone: callToolsContact.mobile_phone_number,
           email: callToolsContact.email,
           sync_status: 'synced',
           last_sync_at: new Date().toISOString(),
@@ -498,7 +496,7 @@ export class ContactSyncService {
           calltools_contact_id: createdContact.id,
           first_name: callToolsContact.first_name,
           last_name: callToolsContact.last_name || null,
-          phone: callToolsContact.phone_number,
+          phone: callToolsContact.mobile_phone_number,
           email: callToolsContact.email || null,
           sync_status: 'synced',
           last_sync_at: new Date().toISOString(),
