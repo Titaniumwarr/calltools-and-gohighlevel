@@ -143,6 +143,7 @@ export class CallToolsClient {
 
       if (!response.ok) {
         if (response.status === 404) {
+          console.log(`No contact found with external_id: ${externalId} (404)`);
           return null;
         }
         const errorText = await response.text();
@@ -151,8 +152,21 @@ export class CallToolsClient {
         );
       }
 
-      const data: CallToolsListResponse = await response.json();
-      return data.contacts && data.contacts.length > 0 ? data.contacts[0] : null;
+      const data: any = await response.json();
+      console.log(`API response structure:`, JSON.stringify(data).substring(0, 500));
+      console.log(`Full API response:`, JSON.stringify(data));
+      
+      // CallTools API returns 'results' array, not 'contacts'
+      const contacts = data.results || data.contacts || [];
+      console.log(`Number of contacts found: ${contacts.length}`);
+      
+      if (contacts.length > 0) {
+        console.log(`Found existing contact: ID ${contacts[0].id}, external_id: ${contacts[0].external_id}`);
+        return contacts[0];
+      } else {
+        console.log(`No contact found with external_id: ${externalId} (empty results)`);
+        return null;
+      }
     } catch (error) {
       console.error('Error fetching contact by external ID:', error);
       return null;
