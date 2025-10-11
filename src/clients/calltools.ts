@@ -318,4 +318,56 @@ export class CallToolsClient {
       );
     }
   }
+
+  /**
+   * Add a tag to a contact
+   */
+  async addTagToContact(contactId: string, tagName: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/contacts/${contactId}/tags`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tag: tagName }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `CallTools API error: ${response.status} - ${errorText}`
+      );
+    }
+  }
+
+  /**
+   * Remove a tag from a contact
+   */
+  async removeTagFromContact(contactId: string, tagName: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/contacts/${contactId}/tags/${encodeURIComponent(tagName)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      // If tag doesn't exist, consider it a success
+      if (response.status === 404) {
+        console.log(`Tag "${tagName}" not found on contact ${contactId}, skipping removal`);
+        return;
+      }
+      const errorText = await response.text();
+      throw new Error(
+        `CallTools API error: ${response.status} - ${errorText}`
+      );
+    }
+  }
 }

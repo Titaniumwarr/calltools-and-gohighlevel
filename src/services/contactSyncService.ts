@@ -59,14 +59,24 @@ export class ContactSyncService {
     error?: string;
   }> {
     try {
-      // Get or create the "Cold Leads" bucket
-      const bucketId = await this.callToolsClient.getOrCreateBucket('Cold Leads');
-
       // Fetch the specific contact from GoHighLevel
       const ghlContact = await this.ghlClient.getContact(ghlContactId);
 
-      // Check if contact is a customer
+      // Check tags
       const tags = (ghlContact.tags || []).map(t => t.toLowerCase());
+      
+      // Check if contact has "ACA Active 2025" or "ACA Active 2026" tag
+      const isActiveClient = tags.some(tag => 
+        tag === 'aca active 2025' ||
+        tag === 'aca active 2026'
+      );
+
+      if (isActiveClient) {
+        // Handle active client sync
+        return await this.syncActiveClient(ghlContact);
+      }
+
+      // Check if contact is a customer (but not specifically ACA Active)
       const isCustomer = tags.some(tag => 
         tag.includes('customer') || 
         tag.includes('client') ||
@@ -99,11 +109,14 @@ export class ContactSyncService {
           contact_id: ghlContactId,
           action: 'excluded',
           bucket_id: null,
-          error: 'Contact does not have cold lead tag',
+          error: 'Contact does not have cold lead or active client tag',
         };
       }
 
-      // Sync the contact
+      // Get or create the "Cold Leads" bucket
+      const bucketId = await this.callToolsClient.getOrCreateBucket('Cold Leads');
+
+      // Sync the contact as cold lead
       const result: SyncResult = {
         total_processed: 1,
         synced: 0,
@@ -131,6 +144,177 @@ export class ContactSyncService {
       return {
         success: false,
         contact_id: ghlContactId,
+        action: 'failed',
+        bucket_id: null,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Sync an active client to CallTools
+   * Handles contacts with "ACA Active 2025" or "ACA Active 2026" tags
+   */
+  private async syncActiveClient(ghlContact: GHLContact): Promise<{
+    success: boolean;
+    contact_id: string;
+    action: 'synced' | 'updated' | 'excluded' | 'failed';
+    bucket_id: string | null;
+    error?: string;
+  }> {
+    try {
+      const ACTIVE_CLIENTS_BUCKET_ID = '11252';
+      const COLD_LEADS_BUCKET_ID = '11237';
+      const ACTIVE_CLIENT_TAG = 'ACA Active client';
+      const COLD_LEAD_TAG = 'ACA Cold lead';
+
+      console.log(`Processing active client: ${ghlContact.id}`);
+
+      // Check if contact has phone number
+      const phone = ghlContact.phone || '';
+      if (!phone) {
+        console.warn(`Contact ${ghlContact.id} has no phone number, skipping`);
+        return {
+          success: false,
+          contact_id: ghlContact.id,
+          action: 'failed',
+          bucket_id: null,
+          error: 'No phone number',
+        };
+      }
+
+      // Prepare CallTools contact data
+      const callToolsContact: CallToolsContact = {
+        first_name: ghlContact.firstName || ghlContact.name || 'Unknown',
+        last_name: ghlContact.lastName || '',
+        phone_number: phone,
+        email: ghlContact.email || '',
+        external_id: ghlContact.id,
+        bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
+      };
+
+      // Check if contact already exists in CallTools
+      const existingCallToolsContact = await this.callToolsClient.getContactByExternalId(
+        ghlContact.id
+      );
+
+      if (existingCallToolsContact) {
+        console.log(`Updating existing contact ${ghlContact.id} as active client`);
+        
+        // Update contact details
+        await this.callToolsClient.updateContact(
+          existingCallToolsContact.id,
+          callToolsContact
+        );
+
+        // Add to Active Clients bucket
+        await this.callToolsClient.addContactToBucket(
+          existingCallToolsContact.id,
+          ACTIVE_CLIENTS_BUCKET_ID
+        );
+        console.log(`Added contact to Active Clients bucket (${ACTIVE_CLIENTS_BUCKET_ID})`);
+
+        // Remove from Cold Leads bucket
+        try {
+          await this.callToolsClient.removeContactFromBucket(
+            existingCallToolsContact.id,
+            COLD_LEADS_BUCKET_ID
+          );
+          console.log(`Removed contact from Cold Leads bucket (${COLD_LEADS_BUCKET_ID})`);
+        } catch (error) {
+          console.log(`Could not remove from Cold Leads bucket (may not be in it):`, error);
+        }
+
+        // Add "ACA Active client" tag
+        await this.callToolsClient.addTagToContact(
+          existingCallToolsContact.id,
+          ACTIVE_CLIENT_TAG
+        );
+        console.log(`Added "${ACTIVE_CLIENT_TAG}" tag`);
+
+        // Remove "ACA Cold lead" tag if it exists
+        try {
+          await this.callToolsClient.removeTagFromContact(
+            existingCallToolsContact.id,
+            COLD_LEAD_TAG
+          );
+          console.log(`Removed "${COLD_LEAD_TAG}" tag`);
+        } catch (error) {
+          console.log(`Could not remove "${COLD_LEAD_TAG}" tag (may not exist):`, error);
+        }
+
+        // Update sync record
+        await this.updateSyncRecord(ghlContact.id, {
+          calltools_contact_id: existingCallToolsContact.id,
+          first_name: callToolsContact.first_name,
+          last_name: callToolsContact.last_name,
+          phone: callToolsContact.phone_number,
+          email: callToolsContact.email,
+          sync_status: 'synced',
+          last_sync_at: new Date().toISOString(),
+          error_message: null,
+        });
+
+        // Mark as customer in our database
+        await this.markAsCustomer(ghlContact.id);
+
+        console.log(`Successfully updated contact ${ghlContact.id} as active client`);
+
+        return {
+          success: true,
+          contact_id: ghlContact.id,
+          action: 'updated',
+          bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
+        };
+      } else {
+        console.log(`Creating new contact ${ghlContact.id} as active client`);
+
+        // Create new contact
+        const createdContact = await this.callToolsClient.createContact(callToolsContact);
+        console.log(`Created contact with ID: ${createdContact.id}`);
+
+        // Add to Active Clients bucket
+        await this.callToolsClient.addContactToBucket(
+          createdContact.id,
+          ACTIVE_CLIENTS_BUCKET_ID
+        );
+        console.log(`Added contact to Active Clients bucket (${ACTIVE_CLIENTS_BUCKET_ID})`);
+
+        // Add "ACA Active client" tag
+        await this.callToolsClient.addTagToContact(
+          createdContact.id,
+          ACTIVE_CLIENT_TAG
+        );
+        console.log(`Added "${ACTIVE_CLIENT_TAG}" tag`);
+
+        // Create sync record
+        await this.createOrUpdateSyncRecord({
+          ghl_contact_id: ghlContact.id,
+          calltools_contact_id: createdContact.id,
+          first_name: callToolsContact.first_name,
+          last_name: callToolsContact.last_name || null,
+          phone: callToolsContact.phone_number,
+          email: callToolsContact.email || null,
+          sync_status: 'synced',
+          last_sync_at: new Date().toISOString(),
+          error_message: null,
+          is_customer: 1, // Mark as customer
+        });
+
+        console.log(`Successfully created contact ${ghlContact.id} as active client`);
+
+        return {
+          success: true,
+          contact_id: ghlContact.id,
+          action: 'synced',
+          bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
+        };
+      }
+    } catch (error) {
+      console.error(`Error syncing active client ${ghlContact.id}:`, error);
+      return {
+        success: false,
+        contact_id: ghlContact.id,
         action: 'failed',
         bucket_id: null,
         error: error instanceof Error ? error.message : 'Unknown error',
