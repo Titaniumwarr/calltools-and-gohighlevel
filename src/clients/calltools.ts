@@ -139,13 +139,13 @@ export class CallToolsClient {
 
       console.log(`Searching for contact by phone: ${phoneNumber}`);
       
-      // Try searching with the search parameter (searches across all contact fields)
-      // This is more reliable than phone_number which may not work as expected
+      // Clean phone number (remove +, spaces, dashes, parentheses)
       const cleanPhone = phoneNumber.replace(/[\+\s\-\(\)]/g, '');
-      console.log(`Using search term: ${cleanPhone}`);
+      console.log(`Searching with phone_number parameter: ${cleanPhone}`);
       
+      // Use phone_number query parameter (documented in CallTools API)
       const response = await fetch(
-        `${this.baseUrl}/api/contacts/?search=${encodeURIComponent(cleanPhone)}`,
+        `${this.baseUrl}/api/contacts/?phone_number=${encodeURIComponent(cleanPhone)}`,
         {
           method: 'GET',
           headers: {
@@ -168,20 +168,12 @@ export class CallToolsClient {
 
       const data: any = await response.json();
       const contacts = data.results || data.contacts || [];
-      console.log(`Search returned ${contacts.length} contacts`);
+      console.log(`phone_number query returned ${contacts.length} contacts`);
       
       if (contacts.length > 0) {
-        // Find contact that matches this phone number
-        for (const contact of contacts) {
-          const contactPhone = contact.mobile_phone_number || contact.home_phone_number || contact.office_phone_number || '';
-          const contactPhoneClean = contactPhone.replace(/[\+\s\-\(\)]/g, '');
-          if (contactPhoneClean === cleanPhone) {
-            console.log(`Found matching contact: ID ${contact.id}, phone: ${contactPhone}`);
-            return contact;
-          }
-        }
-        console.log(`No exact phone match found in ${contacts.length} search results`);
-        return null;
+        // Return the first match
+        console.log(`Found contact: ID ${contacts[0].id}, Name: ${contacts[0].first_name} ${contacts[0].last_name}`);
+        return contacts[0];
       } else {
         console.log(`No contact found with phone: ${phoneNumber}`);
         return null;
