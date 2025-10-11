@@ -10,8 +10,10 @@ A Cloudflare Worker that automatically syncs cold contacts from GoHighLevel to C
 
 ## 🚀 Features
 
-- ⚡ **Real-Time Webhook Sync** - Contacts sync instantly when tagged "cold lead"
-- 📦 **Automatic Bucket Management** - Organizes contacts in "Cold Leads" bucket
+- ⚡ **Real-Time Webhook Sync** - Contacts sync instantly when tagged "cold lead" or "ACA Active"
+- 📦 **Automatic Bucket Management** - Organizes contacts in "Cold Leads" and "ACA Active clients" buckets
+- 🎯 **Active Client Management** - Automatically moves sold contacts to active clients bucket with proper tags
+- 🏷️ **Smart Tag Management** - Adds/removes tags based on contact status (cold lead ↔ active client)
 - 🛡️ **Customer Exclusion** - Automatically filters out existing customers
 - 🔄 **Hybrid Approach** - Webhooks for speed + batch sync for reliability
 - 📊 **Detailed Analytics** - Track sync status and statistics
@@ -91,8 +93,9 @@ See [ARCHITECTURE_COMPARISON.md](./ARCHITECTURE_COMPARISON.md) for detailed comp
 | [QUICKSTART.md](./QUICKSTART.md) | 5-minute setup guide |
 | [SETUP.md](./SETUP.md) | Comprehensive setup & configuration |
 | [WEBHOOK_SETUP.md](./WEBHOOK_SETUP.md) | **Real-time webhook configuration** |
-| [ARCHITECTURE_COMPARISON.md](./ARCHITECTURE_COMPARISON.md) | Webhook vs Batch comparison |
+| [ACTIVE_CLIENTS_FEATURE.md](./ACTIVE_CLIENTS_FEATURE.md) | **Active clients sync & bucket management** |
 | [BUCKET_FEATURE.md](./BUCKET_FEATURE.md) | Cold Leads bucket details |
+| [ARCHITECTURE_COMPARISON.md](./ARCHITECTURE_COMPARISON.md) | Webhook vs Batch comparison |
 
 ---
 
