@@ -311,31 +311,32 @@ export class CallToolsClient {
         console.log(`Created new tag "${tagName}" with ID: ${tagId}`);
       }
 
-      // Step 2: Add contact to the tag
+      // Step 2: Add tag to contact via contact PATCH endpoint
+      // Using contact endpoint is more reliable than tag endpoint
       const contactIdNum = parseInt(contactId);
-      console.log(`Attempting to add contact ${contactIdNum} to tag ${tagId} ("${tagName}")`);
-      console.log(`Request body: ${JSON.stringify({ add_contacts: [contactIdNum] })}`);
+      console.log(`Adding tag ${tagId} ("${tagName}") to contact ${contactIdNum} via contact endpoint`);
+      console.log(`Request body: ${JSON.stringify({ add_tags: [tagId] })}`);
       
-      const addResponse = await fetch(`${this.baseUrl}/api/alltags/${tagId}/`, {
+      const addResponse = await fetch(`${this.baseUrl}/api/contacts/${contactIdNum}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          add_contacts: [contactIdNum],
+          add_tags: [tagId],
         }),
       });
 
       if (!addResponse.ok) {
         const errorText = await addResponse.text();
-        console.error(`Failed to add contact to tag: ${addResponse.status} - ${errorText}`);
-        throw new Error(`Failed to add contact to tag: ${addResponse.status} - ${errorText}`);
+        console.error(`Failed to add tag to contact: ${addResponse.status} - ${errorText}`);
+        throw new Error(`Failed to add tag to contact: ${addResponse.status} - ${errorText}`);
       }
 
       const addResult = await addResponse.json();
-      console.log(`Tag PATCH response: ${JSON.stringify(addResult)}`);
-      console.log(`Successfully added contact ${contactId} to tag "${tagName}"`);
+      console.log(`Contact PATCH response - tags: ${JSON.stringify(addResult.tags || [])}`);
+      console.log(`Successfully added tag "${tagName}" (ID: ${tagId}) to contact ${contactId}`);
     } catch (error) {
       console.error(`Error adding tag: ${error}`);
       // Don't throw error - tagging failure shouldn't break the sync
@@ -500,31 +501,32 @@ export class CallToolsClient {
       const tagId = searchData.results[0].id;
       console.log(`Found tag "${tagName}" with ID: ${tagId}`);
 
-      // Step 2: Remove contact from the tag
+      // Step 2: Remove tag from contact via contact PATCH endpoint
+      // Using contact endpoint is more reliable than tag endpoint
       const contactIdNum = parseInt(contactId);
-      console.log(`Attempting to remove contact ${contactIdNum} from tag ${tagId} ("${tagName}")`);
-      console.log(`Request body: ${JSON.stringify({ remove_contacts: [contactIdNum] })}`);
+      console.log(`Removing tag ${tagId} ("${tagName}") from contact ${contactIdNum} via contact endpoint`);
+      console.log(`Request body: ${JSON.stringify({ remove_tags: [tagId] })}`);
       
-      const removeResponse = await fetch(`${this.baseUrl}/api/alltags/${tagId}/`, {
+      const removeResponse = await fetch(`${this.baseUrl}/api/contacts/${contactIdNum}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          remove_contacts: [contactIdNum],
+          remove_tags: [tagId],
         }),
       });
 
       if (!removeResponse.ok) {
         const errorText = await removeResponse.text();
-        console.error(`Failed to remove contact from tag: ${removeResponse.status} - ${errorText}`);
-        throw new Error(`Failed to remove contact from tag: ${removeResponse.status} - ${errorText}`);
+        console.error(`Failed to remove tag from contact: ${removeResponse.status} - ${errorText}`);
+        throw new Error(`Failed to remove tag from contact: ${removeResponse.status} - ${errorText}`);
       }
 
       const removeResult = await removeResponse.json();
-      console.log(`Tag PATCH response: ${JSON.stringify(removeResult)}`);
-      console.log(`Successfully removed contact ${contactId} from tag "${tagName}"`);
+      console.log(`Contact PATCH response - tags: ${JSON.stringify(removeResult.tags || [])}`);
+      console.log(`Successfully removed tag "${tagName}" (ID: ${tagId}) from contact ${contactId}`);
     } catch (error) {
       console.error(`Error removing tag: ${error}`);
       // Don't throw error - tag removal failure shouldn't break the sync
