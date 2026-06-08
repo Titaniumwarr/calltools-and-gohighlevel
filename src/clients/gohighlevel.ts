@@ -80,29 +80,36 @@ export class GoHighLevelClient {
   }
 
   /**
-   * Get cold contacts (contacts with "cold lead" tag)
-   * Excluding customers (contacts with "customer" tag or in customer pipeline stage)
+   * Fetch every contact in the account (paginated).
+   * Used by the batch sync to route contacts across all insurance lines.
    */
-  async getColdContactsExcludingCustomers(): Promise<GHLContact[]> {
+  async getAllContacts(): Promise<GHLContact[]> {
     const allContacts: GHLContact[] = [];
     let skip = 0;
     const limit = 100;
     let hasMore = true;
 
-    // Fetch all contacts in batches
     while (hasMore) {
       const response = await this.getContacts({ limit, skip });
-      
+
       if (response.contacts && response.contacts.length > 0) {
         allContacts.push(...response.contacts);
         skip += limit;
-        
-        // Check if there are more pages
         hasMore = response.contacts.length === limit;
       } else {
         hasMore = false;
       }
     }
+
+    return allContacts;
+  }
+
+  /**
+   * Get cold contacts (contacts with "cold lead" tag)
+   * Excluding customers (contacts with "customer" tag or in customer pipeline stage)
+   */
+  async getColdContactsExcludingCustomers(): Promise<GHLContact[]> {
+    const allContacts = await this.getAllContacts();
 
     // Filter for cold contacts, excluding customers
     const coldContacts = allContacts.filter(contact => {

@@ -17,7 +17,15 @@
   // Environment variables for API integrations
   // Note: Set these via: wrangler secret put <SECRET_NAME>
   "vars": {
-    "CALLTOOLS_BASE_URL": "https://east-1.calltools.io"
+    "CALLTOOLS_BASE_URL": "https://east-1.calltools.io",
+    // CallTools bucket IDs per insurance line.
+    // ACA defaults match the historical hardcoded values; override if needed.
+    "ACA_COLD_LEADS_BUCKET_ID": "11237",
+    "ACA_ACTIVE_CLIENTS_BUCKET_ID": "11252",
+    // Auto Insurance buckets - REPLACE with the real bucket IDs from CallTools.
+    // Until these are set, Auto contacts will be skipped with a clear error.
+    "AUTO_COLD_LEADS_BUCKET_ID": "",
+    "AUTO_ACTIVE_CLIENTS_BUCKET_ID": ""
   }
   // Secrets (set via wrangler secret put):
   // - GHL_API_KEY: GoHighLevel API key

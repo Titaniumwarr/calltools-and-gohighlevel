@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HandleArgs } from '../../types';
 import { ContactSyncService } from '../../services/contactSyncService';
 import { WebhookVerificationService } from '../../services/webhookVerification';
+import { getInsuranceLines } from '../../config/insuranceLines';
 
 // GoHighLevel webhook payload schema - flexible to handle different formats
 const GHLWebhookSchema = z.object({
@@ -160,7 +161,8 @@ export class GHLWebhook extends OpenAPIRoute<HandleArgs> {
         env.GHL_API_KEY,
         env.CALLTOOLS_API_KEY,
         env.CALLTOOLS_BASE_URL,
-        env.DB
+        env.DB,
+        getInsuranceLines(env)
       );
 
       // Sync the specific contact, passing webhook data to avoid API call

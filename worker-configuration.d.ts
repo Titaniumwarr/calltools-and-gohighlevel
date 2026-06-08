@@ -8,6 +8,10 @@ declare namespace Cloudflare {
 		CALLTOOLS_API_KEY: string;
 		CALLTOOLS_BASE_URL?: string;
 		GHL_WEBHOOK_SECRET?: string;
+		ACA_COLD_LEADS_BUCKET_ID?: string;
+		ACA_ACTIVE_CLIENTS_BUCKET_ID?: string;
+		AUTO_COLD_LEADS_BUCKET_ID?: string;
+		AUTO_ACTIVE_CLIENTS_BUCKET_ID?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}
