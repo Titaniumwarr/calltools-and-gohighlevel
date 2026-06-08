@@ -2,6 +2,7 @@ import { OpenAPIRoute } from 'chanfana';
 import { z } from 'zod';
 import { HandleArgs } from '../../types';
 import { ContactSyncService } from '../../services/contactSyncService';
+import { getInsuranceLines } from '../../config/insuranceLines';
 
 // GHL Workflow payload schema - flexible to handle different formats
 const GHLWorkflowSchema = z.object({
@@ -132,7 +133,8 @@ export class GHLWorkflow extends OpenAPIRoute<HandleArgs> {
         env.GHL_API_KEY,
         env.CALLTOOLS_API_KEY,
         env.CALLTOOLS_BASE_URL,
-        env.DB
+        env.DB,
+        getInsuranceLines(env)
       );
 
       // Sync the specific contact

@@ -11,6 +11,7 @@ A Cloudflare Worker that automatically syncs cold contacts from GoHighLevel to C
 ## 🚀 Features
 
 - ⚡ **Real-Time Webhook Sync** - Contacts sync instantly when tagged "cold lead" or "ACA Active"
+- 🚗 **Multi-Line Support** - Separate routing/buckets/tags per insurance line (ACA/Health + Auto). See [AUTO_INSURANCE_FEATURE.md](./AUTO_INSURANCE_FEATURE.md)
 - 📦 **Automatic Bucket Management** - Organizes contacts in "Cold Leads" and "ACA Active clients" buckets
 - 🎯 **Active Client Management** - Automatically moves sold contacts to active clients bucket with proper tags
 - 🏷️ **Smart Tag Management** - Adds/removes tags based on contact status (cold lead ↔ active client)

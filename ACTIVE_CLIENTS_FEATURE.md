@@ -259,6 +259,26 @@ The system attempts to remove contacts from Cold Leads bucket. If a contact rema
 2. Verify tag name is "ACA Active client" (exact)
 3. Check if tag already exists in CallTools
 
+## ACA Win-Back (lapsed / cancelled clients)
+
+When an ACA client lapses or cancels, tag them in GoHighLevel with
+`winback – aca` to re-pursue the sale. The integration then:
+
+- Adds the contact to the **Win-Back / Past Clients (ACA)** bucket (`11238`,
+  configurable via `ACA_WINBACK_BUCKET_ID`)
+- Applies the **`winback – aca`** CallTools tag (id `132076`)
+- Removes the contact from the **Cold Leads** (`11237`) and **ACA Active
+  clients** (`11252`) buckets and removes the `ACA Cold Lead` / `ACA Active
+  Client` tags
+- Resets the contact's customer flag so they are callable again (winback
+  overrides the "is customer / exclude from sync" guard)
+
+If the contact later re-buys (gets an `ACA Active` tag again), the active state
+takes priority and removes them from the Win-Back bucket/tag.
+
+> Tip: have your GoHighLevel winback workflow **remove the `ACA Active` tag** when
+> it adds `winback – aca`, so the active state doesn't out-prioritize winback.
+
 ## Related Documentation
 
 - [BUCKET_FEATURE.md](./BUCKET_FEATURE.md) - Cold Leads bucket details

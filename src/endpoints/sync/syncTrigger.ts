@@ -2,6 +2,7 @@ import { OpenAPIRoute, Str } from 'chanfana';
 import { z } from 'zod';
 import { HandleArgs } from '../../types';
 import { ContactSyncService } from '../../services/contactSyncService';
+import { getInsuranceLines } from '../../config/insuranceLines';
 
 export class SyncTrigger extends OpenAPIRoute<HandleArgs> {
   schema = {
@@ -68,7 +69,8 @@ export class SyncTrigger extends OpenAPIRoute<HandleArgs> {
         env.GHL_API_KEY,
         env.CALLTOOLS_API_KEY,
         env.CALLTOOLS_BASE_URL,
-        env.DB
+        env.DB,
+        getInsuranceLines(env)
       );
 
       // Run sync
