@@ -171,7 +171,8 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
           name: 'cold',
           matchers: ['cold lead', 'cold', 'new lead', 'prospect'],
           bucketId: acaCold,
-          tag: 'ACA Cold lead',
+          // CallTools tag (id 128365)
+          tag: 'ACA Cold Lead',
           removeBucketIds: [],
           removeTags: [],
           isCustomer: false,
@@ -180,9 +181,10 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
           name: 'active',
           matchers: ['aca active 2025', 'aca active 2026', 'aca active client'],
           bucketId: acaActive,
-          tag: 'ACA Active client',
+          // CallTools tag (id 129315)
+          tag: 'ACA Active Client',
           removeBucketIds: [acaCold],
-          removeTags: ['ACA Cold lead'],
+          removeTags: ['ACA Cold Lead'],
           isCustomer: true,
         },
       ],

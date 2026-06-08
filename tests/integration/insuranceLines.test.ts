@@ -68,19 +68,21 @@ describe('Auto Insurance routing', () => {
 });
 
 describe('ACA Insurance routing (unchanged)', () => {
-  it('routes a generic cold lead to the ACA Cold bucket', () => {
-    expect(match(['cold lead'])).toEqual({
-      line: 'aca',
-      state: 'cold',
-      bucket: '11237',
-    });
+  it('routes a generic cold lead to the ACA Cold bucket with the ACA Cold Lead tag', () => {
+    const m = matchInsuranceLine(['cold lead'], lines)!;
+    expect(m.line.key).toBe('aca');
+    expect(m.state.name).toBe('cold');
+    expect(m.state.bucketId).toBe('11237');
+    expect(m.state.tag).toBe('ACA Cold Lead');
   });
 
-  it('routes "ACA Active 2026" to the ACA Active bucket', () => {
+  it('routes "ACA Active 2026" to the ACA Active bucket with the ACA Active Client tag', () => {
     const m = matchInsuranceLine(['ACA Active 2026'], lines)!;
     expect(m.line.key).toBe('aca');
     expect(m.state.name).toBe('active');
     expect(m.state.bucketId).toBe('11252');
+    expect(m.state.tag).toBe('ACA Active Client');
+    expect(m.state.removeTags).toContain('ACA Cold Lead');
   });
 
   it('returns null when no insurance tag is present', () => {
