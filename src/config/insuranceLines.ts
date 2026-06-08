@@ -5,54 +5,60 @@
  * insurance products ("lines of business") are routed to different CallTools
  * buckets and tagged differently so each campaign stays isolated.
  *
- * Each line can have up to three tiers a contact progresses through:
- *   cold  -> hot (optional) -> active (sold)
+ * Each line declares a set of "states" (cold lead, hot lead, active client).
+ * A state is triggered by GoHighLevel tags and, when matched, the contact is:
+ *   - added to that state's CallTools bucket + tag
+ *   - removed from the buckets/tags listed in `removeBucketIds` / `removeTags`
  *
- * Each tier maps to its own CallTools bucket and tag. When a contact moves up a
- * tier it is added to the higher bucket/tag and removed from the lower ones.
+ * This explicit add/remove model lets each tag do exactly what the business
+ * wants (e.g. "cold removes from hot"), without assuming a fixed tier ordering.
  *
- * Lines are evaluated in array order, so more specific lines (e.g. Auto, whose
- * tags also contain generic words like "cold") MUST come before more generic
- * lines (ACA) to avoid mis-routing.
+ * Lines are evaluated so that more specific lines (Auto, whose tags contain
+ * generic words like "cold") win over generic lines (ACA) at the same state
+ * priority.
  */
+
+export type StateName = 'cold' | 'hot' | 'active';
+
+/**
+ * Detection/priority ordering when a contact matches more than one state.
+ * Lower number = higher priority. A contact that has accumulated several tags
+ * (e.g. an old "hot" tag plus a new "cold" tag) resolves to the highest
+ * priority state, so: active > cold > hot.
+ */
+export const STATE_PRIORITY: Record<StateName, number> = {
+  active: 0,
+  cold: 1,
+  hot: 2,
+};
+
+export interface LineState {
+  /** Which tier this state represents. */
+  name: StateName;
+  /**
+   * GoHighLevel tag fragments (will be normalized) that trigger this state.
+   * Matched as a normalized substring (case/dash/space insensitive).
+   */
+  matchers: string[];
+  /** CallTools bucket/list ID the contact is added to. */
+  bucketId: string;
+  /** CallTools tag applied to the contact. */
+  tag: string;
+  /** CallTools bucket/list IDs the contact is removed from. */
+  removeBucketIds: string[];
+  /** CallTools tags removed from the contact. */
+  removeTags: string[];
+  /** Whether reaching this state marks the contact as a customer (excluded from cold syncs). */
+  isCustomer: boolean;
+}
 
 export interface InsuranceLineConfig {
   /** Stable identifier for the line, e.g. "aca" or "auto". */
   key: string;
   /** Human friendly label used in logs / responses. */
   label: string;
-
-  // ---- GoHighLevel tag detection ----
-  /**
-   * Tags (lowercase) that mark a contact as an active/sold client for this
-   * line. Matched exactly (case-insensitive).
-   */
-  activeClientTags: string[];
-  /**
-   * Tag fragments (lowercase) that mark a contact as a hot lead for this line.
-   * Matched as a substring (case-insensitive). Optional - omit for lines
-   * without a hot-lead tier.
-   */
-  hotLeadMatchers?: string[];
-  /**
-   * Tag fragments (lowercase) that mark a contact as a cold lead for this line.
-   * Matched as a substring (case-insensitive).
-   */
-  coldLeadMatchers: string[];
-
-  // ---- CallTools targets ----
-  /** CallTools bucket/list ID that cold leads are added to. */
-  coldLeadsBucketId: string;
-  /** CallTools bucket/list ID that hot leads are moved to (optional). */
-  hotLeadsBucketId?: string;
-  /** CallTools bucket/list ID that active clients are moved to. */
-  activeClientsBucketId: string;
-  /** CallTools tag applied to cold leads for this line. */
-  coldLeadTag: string;
-  /** CallTools tag applied to hot leads for this line (optional). */
-  hotLeadTag?: string;
-  /** CallTools tag applied to active clients for this line. */
-  activeClientTag: string;
+  /** The states (tiers) this line supports. */
+  states: LineState[];
 }
 
 /**
@@ -74,100 +80,134 @@ function pick(value: string | undefined, fallback: string): string {
 }
 
 /**
+ * Normalize a tag (or matcher) for comparison: lowercase, convert en/em dashes
+ * to a plain hyphen, and collapse runs of whitespace. Underscores are kept so
+ * tags like `cold_lead_auto` match exactly.
+ */
+export function normalizeTag(tag: string): string {
+  return String(tag)
+    .toLowerCase()
+    .replace(/[\u2012\u2013\u2014\u2015]/g, '-') // figure/en/em/horizontal dashes -> hyphen
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Build the list of insurance lines for the current environment.
  *
- * NOTE: order matters. Auto is listed first because its cold-lead tags (e.g.
- * "auto cold lead") also contain generic words like "cold" that the ACA line
- * matches. Evaluating Auto first guarantees Auto contacts are not swept into
- * the ACA bucket.
+ * NOTE: Auto is listed before ACA so that Auto tags (which contain generic
+ * words like "cold") are routed to Auto buckets rather than ACA.
  */
 export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] {
+  const autoCold = pick(env.AUTO_COLD_LEADS_BUCKET_ID, '11880');
+  const autoHot = pick(env.AUTO_HOT_LEADS_BUCKET_ID, '11879');
+  const autoActive = pick(env.AUTO_ACTIVE_CLIENTS_BUCKET_ID, '11881');
+
+  const acaCold = pick(env.ACA_COLD_LEADS_BUCKET_ID, '11237');
+  const acaActive = pick(env.ACA_ACTIVE_CLIENTS_BUCKET_ID, '11252');
+
   return [
     {
       key: 'auto',
       label: 'Auto Insurance',
-      activeClientTags: ['auto active 2025', 'auto active 2026', 'auto active client'],
-      hotLeadMatchers: ['auto hot lead', 'auto hot', 'auto warm'],
-      coldLeadMatchers: [
-        'auto cold lead',
-        'auto cold',
-        'auto lead',
-        'auto prospect',
-        'auto insurance',
-        'auto new lead',
+      states: [
+        {
+          name: 'hot',
+          // GHL tag: "auto – autoquote click"
+          matchers: ['auto - autoquote click', 'autoquote click', 'autoquote'],
+          bucketId: autoHot,
+          tag: 'Auto Hot lead',
+          removeBucketIds: [],
+          removeTags: [],
+          isCustomer: false,
+        },
+        {
+          name: 'cold',
+          // GHL tag: "cold_lead_auto"
+          matchers: ['cold_lead_auto', 'cold lead auto'],
+          bucketId: autoCold,
+          tag: 'Auto Cold lead',
+          // Adding to cold removes the contact from the hot bucket/tag.
+          removeBucketIds: [autoHot],
+          removeTags: ['Auto Hot lead'],
+          isCustomer: false,
+        },
+        {
+          name: 'active',
+          // GHL tag: "auto – active"
+          matchers: ['auto - active', 'auto active', 'auto active client', 'auto active 2025', 'auto active 2026'],
+          bucketId: autoActive,
+          tag: 'Auto Active client',
+          // Active removes the contact from both cold and hot.
+          removeBucketIds: [autoCold, autoHot],
+          removeTags: ['Auto Cold lead', 'Auto Hot lead'],
+          isCustomer: true,
+        },
       ],
-      // CallTools bucket IDs (override per deployment via env vars).
-      coldLeadsBucketId: pick(env.AUTO_COLD_LEADS_BUCKET_ID, '11880'),
-      hotLeadsBucketId: pick(env.AUTO_HOT_LEADS_BUCKET_ID, '11879'),
-      activeClientsBucketId: pick(env.AUTO_ACTIVE_CLIENTS_BUCKET_ID, '11881'),
-      coldLeadTag: 'Auto Cold lead',
-      hotLeadTag: 'Auto Hot lead',
-      activeClientTag: 'Auto Active client',
     },
     {
       key: 'aca',
       label: 'ACA / Health Insurance',
-      activeClientTags: ['aca active 2025', 'aca active 2026', 'aca active client'],
-      coldLeadMatchers: ['cold lead', 'cold', 'new lead', 'prospect'],
-      // Preserve the historical hardcoded ACA bucket IDs as defaults.
-      coldLeadsBucketId: pick(env.ACA_COLD_LEADS_BUCKET_ID, '11237'),
-      activeClientsBucketId: pick(env.ACA_ACTIVE_CLIENTS_BUCKET_ID, '11252'),
-      coldLeadTag: 'ACA Cold lead',
-      activeClientTag: 'ACA Active client',
+      states: [
+        {
+          name: 'cold',
+          matchers: ['cold lead', 'cold', 'new lead', 'prospect'],
+          bucketId: acaCold,
+          tag: 'ACA Cold lead',
+          removeBucketIds: [],
+          removeTags: [],
+          isCustomer: false,
+        },
+        {
+          name: 'active',
+          matchers: ['aca active 2025', 'aca active 2026', 'aca active client'],
+          bucketId: acaActive,
+          tag: 'ACA Active client',
+          removeBucketIds: [acaCold],
+          removeTags: ['ACA Cold lead'],
+          isCustomer: true,
+        },
+      ],
     },
   ];
 }
 
-export type MatchType = 'active' | 'hot' | 'cold';
-
 export interface LineMatch {
   line: InsuranceLineConfig;
-  type: MatchType;
+  state: LineState;
 }
 
 /**
- * Determine which insurance line (and which tier) a set of GoHighLevel tags
- * belongs to.
+ * Determine which insurance line + state a set of GoHighLevel tags maps to.
  *
- * Priority is active > hot > cold, evaluated across all lines in the order
- * returned by {@link getInsuranceLines}.
+ * If multiple states match (e.g. accumulated tags), the highest priority state
+ * wins (active > cold > hot). Ties are broken by line order, so Auto beats ACA.
  */
 export function matchInsuranceLine(
   tags: string[],
   lines: InsuranceLineConfig[]
 ): LineMatch | null {
-  const lowerTags = tags.map((t) => t.toLowerCase().trim());
+  const normalizedTags = tags.map(normalizeTag).filter((t) => t.length > 0);
 
-  // 1. Active clients (exact tag match) across all lines.
-  for (const line of lines) {
-    const isActive = lowerTags.some((tag) => line.activeClientTags.includes(tag));
-    if (isActive) {
-      return { line, type: 'active' };
-    }
-  }
+  let best: LineMatch | null = null;
+  let bestRank = Number.POSITIVE_INFINITY;
 
-  // 2. Hot leads (substring match) for lines that define a hot tier.
-  for (const line of lines) {
-    if (!line.hotLeadMatchers || !line.hotLeadsBucketId) {
-      continue;
+  lines.forEach((line, lineIndex) => {
+    for (const state of line.states) {
+      const matched = normalizedTags.some((tag) =>
+        state.matchers.some((matcher) => tag.includes(normalizeTag(matcher)))
+      );
+      if (!matched) {
+        continue;
+      }
+      // Composite rank: state priority dominates, line order is the tie-breaker.
+      const rank = STATE_PRIORITY[state.name] * 100 + lineIndex;
+      if (rank < bestRank) {
+        bestRank = rank;
+        best = { line, state };
+      }
     }
-    const isHot = lowerTags.some((tag) =>
-      line.hotLeadMatchers!.some((matcher) => tag.includes(matcher))
-    );
-    if (isHot) {
-      return { line, type: 'hot' };
-    }
-  }
+  });
 
-  // 3. Cold leads (substring match) in line priority order.
-  for (const line of lines) {
-    const isCold = lowerTags.some((tag) =>
-      line.coldLeadMatchers.some((matcher) => tag.includes(matcher))
-    );
-    if (isCold) {
-      return { line, type: 'cold' };
-    }
-  }
-
-  return null;
+  return best;
 }
