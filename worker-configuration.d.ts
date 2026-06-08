@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 		ACA_COLD_LEADS_BUCKET_ID?: string;
 		ACA_ACTIVE_CLIENTS_BUCKET_ID?: string;
 		AUTO_COLD_LEADS_BUCKET_ID?: string;
+		AUTO_HOT_LEADS_BUCKET_ID?: string;
 		AUTO_ACTIVE_CLIENTS_BUCKET_ID?: string;
 	}
 }

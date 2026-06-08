@@ -105,6 +105,14 @@ export class ContactSyncService {
         return await this.syncActiveClient(ghlContact, match.line);
       }
 
+      // Hot leads (engaged but not yet sold) - promote to the line's hot bucket
+      if (match && match.type === 'hot') {
+        console.log(
+          `Contact ${ghlContactId} matched hot lead for line "${match.line.label}"`
+        );
+        return await this.promoteContact(ghlContact, match.line, 'hot');
+      }
+
       // Generic customer exclusion (not tied to a specific line). A contact
       // flagged as a generic customer/won/purchased lead should never be dialed
       // as a cold lead.
@@ -192,9 +200,7 @@ export class ContactSyncService {
   }
 
   /**
-   * Sync an active client to CallTools.
-   * Handles contacts whose GoHighLevel tags mark them as an active/sold client
-   * for a given insurance line (e.g. "ACA Active 2025", "Auto Active 2026").
+   * Convenience wrapper: promote a contact to the active-client tier.
    */
   private async syncActiveClient(
     ghlContact: GHLContact,
@@ -206,24 +212,58 @@ export class ContactSyncService {
     bucket_id: string | null;
     error?: string;
   }> {
+    return this.promoteContact(ghlContact, line, 'active');
+  }
+
+  /**
+   * Promote a contact into a higher tier (hot lead or active client) for a line.
+   *
+   * The contact is created/updated in CallTools, added to the target tier's
+   * bucket/tag, and removed from the buckets/tags of all lower tiers. Active
+   * clients are additionally marked as customers in the database (and excluded
+   * from future cold-lead syncs); hot leads are not.
+   */
+  private async promoteContact(
+    ghlContact: GHLContact,
+    line: InsuranceLineConfig,
+    tier: 'hot' | 'active'
+  ): Promise<{
+    success: boolean;
+    contact_id: string;
+    action: 'synced' | 'updated' | 'excluded' | 'failed';
+    bucket_id: string | null;
+    error?: string;
+  }> {
     try {
-      const ACTIVE_CLIENTS_BUCKET_ID = line.activeClientsBucketId;
-      const COLD_LEADS_BUCKET_ID = line.coldLeadsBucketId;
-      const ACTIVE_CLIENT_TAG = line.activeClientTag;
-      const COLD_LEAD_TAG = line.coldLeadTag;
+      const isActive = tier === 'active';
+      const tierLabel = isActive ? 'active client' : 'hot lead';
 
-      console.log(`Processing active client for line "${line.label}": ${ghlContact.id}`);
+      // Resolve the target bucket/tag and the lower tiers to clean up.
+      const targetBucketId = isActive ? line.activeClientsBucketId : (line.hotLeadsBucketId || '');
+      const targetTag = isActive ? line.activeClientTag : (line.hotLeadTag || '');
 
-      if (!ACTIVE_CLIENTS_BUCKET_ID) {
+      // Lower-tier buckets/tags to remove the contact from on promotion.
+      const removeBucketIds: string[] = [];
+      const removeTags: string[] = [];
+      if (line.coldLeadsBucketId) removeBucketIds.push(line.coldLeadsBucketId);
+      if (line.coldLeadTag) removeTags.push(line.coldLeadTag);
+      if (isActive) {
+        if (line.hotLeadsBucketId) removeBucketIds.push(line.hotLeadsBucketId);
+        if (line.hotLeadTag) removeTags.push(line.hotLeadTag);
+      }
+
+      console.log(`Processing ${tierLabel} for line "${line.label}": ${ghlContact.id}`);
+
+      if (!targetBucketId || !targetTag) {
         console.error(
-          `No active clients bucket configured for line "${line.label}", cannot sync ${ghlContact.id}`
+          `No ${tierLabel} bucket configured for line "${line.label}", cannot sync ${ghlContact.id}`
         );
         return {
           success: false,
           contact_id: ghlContact.id,
           action: 'failed',
           bucket_id: null,
-          error: `No active clients bucket configured for line "${line.label}". Set the corresponding bucket env var.`,
+          error: `No ${tierLabel} bucket configured for line "${line.label}". Set the corresponding bucket env var.`,
         };
       }
 
@@ -246,7 +286,7 @@ export class ContactSyncService {
         last_name: ghlContact.lastName || '',
         mobile_phone_number: phone,
         personal_email_address: ghlContact.email || '',
-        bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
+        bucket_id: targetBucketId,
       };
 
       // Check if contact already exists in CallTools (search by phone)
@@ -255,122 +295,78 @@ export class ContactSyncService {
         phone
       );
 
-      if (existingCallToolsContact) {
-        console.log(`Updating existing contact ${ghlContact.id} as active client`);
-        
-        // Update contact details
-        await this.callToolsClient.updateContact(
-          existingCallToolsContact.id,
-          callToolsContact
-        );
+      const contactId = existingCallToolsContact ? existingCallToolsContact.id : null;
+      const isUpdate = contactId !== null;
 
-        // Add to Active Clients bucket
-        await this.callToolsClient.addContactToBucket(
-          existingCallToolsContact.id,
-          ACTIVE_CLIENTS_BUCKET_ID
-        );
-        console.log(`Added contact to Active Clients bucket (${ACTIVE_CLIENTS_BUCKET_ID})`);
-
-        // Remove from Cold Leads bucket
-        if (COLD_LEADS_BUCKET_ID) {
-          try {
-            await this.callToolsClient.removeContactFromBucket(
-              existingCallToolsContact.id,
-              COLD_LEADS_BUCKET_ID
-            );
-            console.log(`Removed contact from Cold Leads bucket (${COLD_LEADS_BUCKET_ID})`);
-          } catch (error) {
-            console.log(`Could not remove from Cold Leads bucket (may not be in it):`, error);
-          }
-        }
-
-        // Add active client tag
-        await this.callToolsClient.addTagToContact(
-          existingCallToolsContact.id,
-          ACTIVE_CLIENT_TAG
-        );
-        console.log(`Added "${ACTIVE_CLIENT_TAG}" tag`);
-
-        // Remove cold lead tag if it exists
-        try {
-          await this.callToolsClient.removeTagFromContact(
-            existingCallToolsContact.id,
-            COLD_LEAD_TAG
-          );
-          console.log(`Removed "${COLD_LEAD_TAG}" tag`);
-        } catch (error) {
-          console.log(`Could not remove "${COLD_LEAD_TAG}" tag (may not exist):`, error);
-        }
-
-        // Update sync record
-        await this.updateSyncRecord(ghlContact.id, {
-          calltools_contact_id: existingCallToolsContact.id,
-          first_name: callToolsContact.first_name,
-          last_name: callToolsContact.last_name,
-          phone: callToolsContact.mobile_phone_number,
-          email: callToolsContact.email,
-          sync_status: 'synced',
-          last_sync_at: new Date().toISOString(),
-          error_message: null,
-        });
-
-        // Mark as customer in our database
-        await this.markAsCustomer(ghlContact.id);
-
-        console.log(`Successfully updated contact ${ghlContact.id} as active client`);
-
-        return {
-          success: true,
-          contact_id: ghlContact.id,
-          action: 'updated',
-          bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
-        };
+      let resolvedContactId: string;
+      if (isUpdate) {
+        console.log(`Updating existing contact ${ghlContact.id} as ${tierLabel}`);
+        await this.callToolsClient.updateContact(contactId!, callToolsContact);
+        resolvedContactId = contactId!;
       } else {
-        console.log(`Creating new contact ${ghlContact.id} as active client`);
-
-        // Create new contact
+        console.log(`Creating new contact ${ghlContact.id} as ${tierLabel}`);
         const createdContact = await this.callToolsClient.createContact(callToolsContact);
         console.log(`Created contact with ID: ${createdContact.id}`);
-
-        // Add to Active Clients bucket
-        await this.callToolsClient.addContactToBucket(
-          createdContact.id,
-          ACTIVE_CLIENTS_BUCKET_ID
-        );
-        console.log(`Added contact to Active Clients bucket (${ACTIVE_CLIENTS_BUCKET_ID})`);
-
-        // Add active client tag
-        await this.callToolsClient.addTagToContact(
-          createdContact.id,
-          ACTIVE_CLIENT_TAG
-        );
-        console.log(`Added "${ACTIVE_CLIENT_TAG}" tag`);
-
-        // Create sync record
-        await this.createOrUpdateSyncRecord({
-          ghl_contact_id: ghlContact.id,
-          calltools_contact_id: createdContact.id,
-          first_name: callToolsContact.first_name,
-          last_name: callToolsContact.last_name || null,
-          phone: callToolsContact.mobile_phone_number,
-          email: callToolsContact.email || null,
-          sync_status: 'synced',
-          last_sync_at: new Date().toISOString(),
-          error_message: null,
-          is_customer: 1, // Mark as customer
-        });
-
-        console.log(`Successfully created contact ${ghlContact.id} as active client`);
-
-        return {
-          success: true,
-          contact_id: ghlContact.id,
-          action: 'synced',
-          bucket_id: ACTIVE_CLIENTS_BUCKET_ID,
-        };
+        resolvedContactId = createdContact.id;
       }
+
+      // Add to the target tier bucket
+      await this.callToolsClient.addContactToBucket(resolvedContactId, targetBucketId);
+      console.log(`Added contact to ${tierLabel} bucket (${targetBucketId})`);
+
+      // Add the target tier tag
+      await this.callToolsClient.addTagToContact(resolvedContactId, targetTag);
+      console.log(`Added "${targetTag}" tag`);
+
+      // Remove from lower-tier buckets
+      for (const bucketId of removeBucketIds) {
+        try {
+          await this.callToolsClient.removeContactFromBucket(resolvedContactId, bucketId);
+          console.log(`Removed contact from lower-tier bucket (${bucketId})`);
+        } catch (error) {
+          console.log(`Could not remove from bucket ${bucketId} (may not be in it):`, error);
+        }
+      }
+
+      // Remove lower-tier tags
+      for (const tag of removeTags) {
+        try {
+          await this.callToolsClient.removeTagFromContact(resolvedContactId, tag);
+          console.log(`Removed "${tag}" tag`);
+        } catch (error) {
+          console.log(`Could not remove "${tag}" tag (may not exist):`, error);
+        }
+      }
+
+      // Update database
+      await this.createOrUpdateSyncRecord({
+        ghl_contact_id: ghlContact.id,
+        calltools_contact_id: resolvedContactId,
+        first_name: callToolsContact.first_name,
+        last_name: callToolsContact.last_name || null,
+        phone: callToolsContact.mobile_phone_number || null,
+        email: callToolsContact.email || null,
+        sync_status: 'synced',
+        last_sync_at: new Date().toISOString(),
+        error_message: null,
+        is_customer: isActive ? 1 : 0,
+      });
+
+      // Active clients are excluded from future cold syncs
+      if (isActive) {
+        await this.markAsCustomer(ghlContact.id);
+      }
+
+      console.log(`Successfully ${isUpdate ? 'updated' : 'created'} contact ${ghlContact.id} as ${tierLabel}`);
+
+      return {
+        success: true,
+        contact_id: ghlContact.id,
+        action: isUpdate ? 'updated' : 'synced',
+        bucket_id: targetBucketId,
+      };
     } catch (error) {
-      console.error(`Error syncing active client ${ghlContact.id}:`, error);
+      console.error(`Error syncing ${tier} for ${ghlContact.id}:`, error);
       return {
         success: false,
         contact_id: ghlContact.id,
@@ -418,16 +414,19 @@ export class ContactSyncService {
         result.total_processed++;
 
         try {
-          if (match.type === 'active') {
-            const activeResult = await this.syncActiveClient(ghlContact, match.line);
-            if (activeResult.action === 'synced') {
+          if (match.type === 'active' || match.type === 'hot') {
+            const promoteResult =
+              match.type === 'active'
+                ? await this.syncActiveClient(ghlContact, match.line)
+                : await this.promoteContact(ghlContact, match.line, 'hot');
+            if (promoteResult.action === 'synced') {
               result.synced++;
-            } else if (activeResult.action === 'updated') {
+            } else if (promoteResult.action === 'updated') {
               result.updated++;
-            } else if (activeResult.action === 'failed') {
+            } else if (promoteResult.action === 'failed') {
               result.failed++;
-              if (activeResult.error) {
-                result.errors.push({ contact_id: ghlContact.id, error: activeResult.error });
+              if (promoteResult.error) {
+                result.errors.push({ contact_id: ghlContact.id, error: promoteResult.error });
               }
             }
             continue;
@@ -577,7 +576,7 @@ export class ContactSyncService {
           calltools_contact_id: createdContact.id,
           first_name: callToolsContact.first_name,
           last_name: callToolsContact.last_name || null,
-          phone: callToolsContact.mobile_phone_number,
+          phone: callToolsContact.mobile_phone_number || null,
           email: callToolsContact.email || null,
           sync_status: 'synced',
           last_sync_at: new Date().toISOString(),

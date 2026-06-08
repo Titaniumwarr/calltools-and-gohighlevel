@@ -7,12 +7,18 @@ The GoHighLevel → CallTools integration now supports multiple **insurance line
 CallTools bucket and applies its own tags, so campaigns stay isolated.
 
 This mirrors the existing **ACA / Health Insurance** flow and adds a parallel
-**Auto Insurance** flow.
+**Auto Insurance** flow. Auto additionally has a **Hot Leads** tier (an engaged
+lead that isn't sold yet), so a contact progresses **cold → hot → active**.
 
-| Line | Cold lead bucket | Active client bucket | Cold lead tag | Active client tag |
-|------|------------------|----------------------|---------------|-------------------|
-| ACA / Health | `ACA_COLD_LEADS_BUCKET_ID` (default `11237`) | `ACA_ACTIVE_CLIENTS_BUCKET_ID` (default `11252`) | `ACA Cold lead` | `ACA Active client` |
-| Auto | `AUTO_COLD_LEADS_BUCKET_ID` | `AUTO_ACTIVE_CLIENTS_BUCKET_ID` | `Auto Cold lead` | `Auto Active client` |
+### CallTools buckets
+
+| Line | Tier | Bucket | Default ID | CallTools tag |
+|------|------|--------|-----------|---------------|
+| ACA / Health | Cold | `ACA_COLD_LEADS_BUCKET_ID` | `11237` | `ACA Cold lead` |
+| ACA / Health | Active | `ACA_ACTIVE_CLIENTS_BUCKET_ID` | `11252` | `ACA Active client` |
+| Auto | Cold | `AUTO_COLD_LEADS_BUCKET_ID` | `11880` (Auto Insurance Cold Leads) | `Auto Cold lead` |
+| Auto | Hot | `AUTO_HOT_LEADS_BUCKET_ID` | `11879` (Auto Insurance Hot Leads) | `Auto Hot lead` |
+| Auto | Active | `AUTO_ACTIVE_CLIENTS_BUCKET_ID` | `11881` (Auto Active Clients) | `Auto Active client` |
 
 ## How a contact is routed
 
@@ -20,12 +26,19 @@ When a contact is received (via webhook, workflow, or batch sync) its
 GoHighLevel tags are inspected by `matchInsuranceLine()`:
 
 1. **Active client check (highest priority).** If a tag exactly matches a
-   line's active-client tags, the contact is treated as an active client for
-   that line.
-2. **Generic customer exclusion.** Contacts tagged `customer` / `won` /
-   `purchased` (and not active for a line) are marked as customers and skipped.
-3. **Cold lead check.** If a tag contains one of a line's cold-lead fragments,
+   line's active-client tags, the contact is treated as an active client.
+2. **Hot lead check.** If a tag contains one of a line's hot-lead fragments
+   (only lines with a hot tier, i.e. Auto), the contact is promoted to the hot
+   bucket.
+3. **Generic customer exclusion.** Contacts tagged `customer` / `won` /
+   `purchased` (and not active/hot for a line) are marked as customers and skipped.
+4. **Cold lead check.** If a tag contains one of a line's cold-lead fragments,
    the contact is synced as a cold lead for that line.
+
+When a contact is promoted to a higher tier, it is added to that tier's bucket
+and tag and **removed from all lower-tier buckets/tags** (e.g. a hot lead is
+removed from the cold bucket; an active client is removed from both cold and hot
+buckets). Active clients are marked as customers; hot leads are not.
 
 Lines are evaluated **Auto before ACA** because Auto tags (e.g.
 `auto cold lead`) also contain the generic word `cold` that the ACA line
@@ -37,57 +50,59 @@ bucket.
 | Intent | Example GoHighLevel tags (case-insensitive) |
 |--------|---------------------------------------------|
 | Auto cold lead | `Auto Cold lead`, `Auto cold`, `Auto lead`, `Auto prospect`, `Auto new lead`, `Auto insurance` |
+| Auto hot lead | `Auto Hot lead`, `Auto hot`, `Auto warm` |
 | Auto active client | `Auto Active 2025`, `Auto Active 2026`, `Auto Active client` |
 
 ### What happens in CallTools
 
 **Auto cold lead:**
 - Creates/updates the contact in CallTools
-- Adds it to the **Auto cold leads** bucket
+- Adds it to the **Auto Insurance Cold Leads** bucket (`11880`)
 - Applies the **`Auto Cold lead`** tag
+
+**Auto hot lead:**
+- Creates/updates the contact in CallTools
+- Adds it to the **Auto Insurance Hot Leads** bucket (`11879`)
+- Removes it from the **Cold Leads** bucket (if present)
+- Applies the **`Auto Hot lead`** tag and removes **`Auto Cold lead`**
 
 **Auto active client:**
 - Creates/updates the contact in CallTools
-- Adds it to the **Auto active clients** bucket
-- Removes it from the **Auto cold leads** bucket (if present)
-- Applies the **`Auto Active client`** tag and removes **`Auto Cold lead`**
+- Adds it to the **Auto Active Clients** bucket (`11881`)
+- Removes it from the **Cold Leads** and **Hot Leads** buckets (if present)
+- Applies the **`Auto Active client`** tag and removes **`Auto Cold lead`** / **`Auto Hot lead`**
 - Marks the contact as a customer in the database
 
 ## Configuration
 
-Set the Auto bucket IDs so the line is active. Until both are set, Auto contacts
-are skipped with a clear `No ... bucket configured for line "Auto Insurance"`
-error (the ACA flow is unaffected).
+The Auto bucket IDs are configured out of the box with the real CallTools
+buckets (cold `11880`, hot `11879`, active `11881`). They can be overridden per
+deployment via env vars. If a required bucket is missing, that contact is
+skipped with a clear `No ... bucket configured for line "Auto Insurance"` error
+(the ACA flow is unaffected).
 
-### Local / `.env`
+### Cloudflare Worker (`wrangler.jsonc`)
 
-```bash
-AUTO_COLD_LEADS_BUCKET_ID=<your auto cold leads bucket id>
-AUTO_ACTIVE_CLIENTS_BUCKET_ID=<your auto active clients bucket id>
-```
-
-### Cloudflare Worker
-
-These are plain (non-secret) vars, set in `wrangler.jsonc`:
+These are plain (non-secret) vars:
 
 ```jsonc
 "vars": {
-  "AUTO_COLD_LEADS_BUCKET_ID": "12345",
-  "AUTO_ACTIVE_CLIENTS_BUCKET_ID": "12346"
+  "AUTO_COLD_LEADS_BUCKET_ID": "11880",
+  "AUTO_HOT_LEADS_BUCKET_ID": "11879",
+  "AUTO_ACTIVE_CLIENTS_BUCKET_ID": "11881"
 }
 ```
 
-Find the bucket IDs in CallTools (Lists / Buckets) or via the API
-`GET /api/lists/`. Create two new buckets first, e.g. "Auto Cold Leads" and
-"Auto Active Clients".
+Find bucket IDs in CallTools (Lists / Buckets) or via `GET /api/lists/`.
 
 ## GoHighLevel workflow setup
 
 Reuse the same webhook endpoint as ACA (`/webhook/ghl-workflow` or
 `/webhook/ghl`). Create workflows that fire when an Auto tag is added:
 
-1. **Trigger:** Contact Tag Added → tag is `Auto Cold lead` (cold campaign) or
-   `Auto Active 2025` / `Auto Active 2026` (active client).
+1. **Trigger:** Contact Tag Added → tag is `Auto Cold lead` (cold campaign),
+   `Auto Hot lead` (hot campaign), or `Auto Active 2025` / `Auto Active 2026`
+   (active client).
 2. **Action:** HTTP POST to your worker webhook URL with body:
 
 ```json

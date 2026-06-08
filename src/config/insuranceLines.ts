@@ -5,10 +5,11 @@
  * insurance products ("lines of business") are routed to different CallTools
  * buckets and tagged differently so each campaign stays isolated.
  *
- * Each line defines:
- *  - how to detect cold leads / active clients from GoHighLevel tags
- *  - which CallTools bucket cold leads and active clients land in
- *  - which CallTools tags are applied for cold leads and active clients
+ * Each line can have up to three tiers a contact progresses through:
+ *   cold  -> hot (optional) -> active (sold)
+ *
+ * Each tier maps to its own CallTools bucket and tag. When a contact moves up a
+ * tier it is added to the higher bucket/tag and removed from the lower ones.
  *
  * Lines are evaluated in array order, so more specific lines (e.g. Auto, whose
  * tags also contain generic words like "cold") MUST come before more generic
@@ -20,22 +21,36 @@ export interface InsuranceLineConfig {
   key: string;
   /** Human friendly label used in logs / responses. */
   label: string;
+
+  // ---- GoHighLevel tag detection ----
   /**
-   * GoHighLevel tags (lowercase) that mark a contact as an active/sold client
-   * for this line. Matched exactly (case-insensitive).
+   * Tags (lowercase) that mark a contact as an active/sold client for this
+   * line. Matched exactly (case-insensitive).
    */
   activeClientTags: string[];
   /**
-   * GoHighLevel tag fragments (lowercase) that mark a contact as a cold lead
-   * for this line. Matched as a substring (case-insensitive).
+   * Tag fragments (lowercase) that mark a contact as a hot lead for this line.
+   * Matched as a substring (case-insensitive). Optional - omit for lines
+   * without a hot-lead tier.
+   */
+  hotLeadMatchers?: string[];
+  /**
+   * Tag fragments (lowercase) that mark a contact as a cold lead for this line.
+   * Matched as a substring (case-insensitive).
    */
   coldLeadMatchers: string[];
+
+  // ---- CallTools targets ----
   /** CallTools bucket/list ID that cold leads are added to. */
   coldLeadsBucketId: string;
+  /** CallTools bucket/list ID that hot leads are moved to (optional). */
+  hotLeadsBucketId?: string;
   /** CallTools bucket/list ID that active clients are moved to. */
   activeClientsBucketId: string;
   /** CallTools tag applied to cold leads for this line. */
   coldLeadTag: string;
+  /** CallTools tag applied to hot leads for this line (optional). */
+  hotLeadTag?: string;
   /** CallTools tag applied to active clients for this line. */
   activeClientTag: string;
 }
@@ -49,6 +64,7 @@ export interface InsuranceLineEnv {
   ACA_COLD_LEADS_BUCKET_ID?: string;
   ACA_ACTIVE_CLIENTS_BUCKET_ID?: string;
   AUTO_COLD_LEADS_BUCKET_ID?: string;
+  AUTO_HOT_LEADS_BUCKET_ID?: string;
   AUTO_ACTIVE_CLIENTS_BUCKET_ID?: string;
 }
 
@@ -71,6 +87,7 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
       key: 'auto',
       label: 'Auto Insurance',
       activeClientTags: ['auto active 2025', 'auto active 2026', 'auto active client'],
+      hotLeadMatchers: ['auto hot lead', 'auto hot', 'auto warm'],
       coldLeadMatchers: [
         'auto cold lead',
         'auto cold',
@@ -79,10 +96,12 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
         'auto insurance',
         'auto new lead',
       ],
-      // Configure these via env vars; no safe default exists for Auto buckets.
-      coldLeadsBucketId: pick(env.AUTO_COLD_LEADS_BUCKET_ID, ''),
-      activeClientsBucketId: pick(env.AUTO_ACTIVE_CLIENTS_BUCKET_ID, ''),
+      // CallTools bucket IDs (override per deployment via env vars).
+      coldLeadsBucketId: pick(env.AUTO_COLD_LEADS_BUCKET_ID, '11880'),
+      hotLeadsBucketId: pick(env.AUTO_HOT_LEADS_BUCKET_ID, '11879'),
+      activeClientsBucketId: pick(env.AUTO_ACTIVE_CLIENTS_BUCKET_ID, '11881'),
       coldLeadTag: 'Auto Cold lead',
+      hotLeadTag: 'Auto Hot lead',
       activeClientTag: 'Auto Active client',
     },
     {
@@ -99,7 +118,7 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
   ];
 }
 
-export type MatchType = 'active' | 'cold';
+export type MatchType = 'active' | 'hot' | 'cold';
 
 export interface LineMatch {
   line: InsuranceLineConfig;
@@ -107,11 +126,11 @@ export interface LineMatch {
 }
 
 /**
- * Determine which insurance line (and whether cold/active) a set of GoHighLevel
- * tags belongs to.
+ * Determine which insurance line (and which tier) a set of GoHighLevel tags
+ * belongs to.
  *
- * Active-client detection takes priority over cold-lead detection, and lines
- * are evaluated in the order returned by {@link getInsuranceLines}.
+ * Priority is active > hot > cold, evaluated across all lines in the order
+ * returned by {@link getInsuranceLines}.
  */
 export function matchInsuranceLine(
   tags: string[],
@@ -119,7 +138,7 @@ export function matchInsuranceLine(
 ): LineMatch | null {
   const lowerTags = tags.map((t) => t.toLowerCase().trim());
 
-  // 1. Active clients first (exact tag match) across all lines.
+  // 1. Active clients (exact tag match) across all lines.
   for (const line of lines) {
     const isActive = lowerTags.some((tag) => line.activeClientTags.includes(tag));
     if (isActive) {
@@ -127,7 +146,20 @@ export function matchInsuranceLine(
     }
   }
 
-  // 2. Cold leads (substring match) in line priority order.
+  // 2. Hot leads (substring match) for lines that define a hot tier.
+  for (const line of lines) {
+    if (!line.hotLeadMatchers || !line.hotLeadsBucketId) {
+      continue;
+    }
+    const isHot = lowerTags.some((tag) =>
+      line.hotLeadMatchers!.some((matcher) => tag.includes(matcher))
+    );
+    if (isHot) {
+      return { line, type: 'hot' };
+    }
+  }
+
+  // 3. Cold leads (substring match) in line priority order.
   for (const line of lines) {
     const isCold = lowerTags.some((tag) =>
       line.coldLeadMatchers.some((matcher) => tag.includes(matcher))
