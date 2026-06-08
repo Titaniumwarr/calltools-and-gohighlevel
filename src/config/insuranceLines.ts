@@ -23,13 +23,16 @@ export type StateName = 'cold' | 'hot' | 'active';
 /**
  * Detection/priority ordering when a contact matches more than one state.
  * Lower number = higher priority. A contact that has accumulated several tags
- * (e.g. an old "hot" tag plus a new "cold" tag) resolves to the highest
- * priority state, so: active > cold > hot.
+ * resolves to the highest priority state, so: active > hot > cold.
+ *
+ * Hot beats cold so that a lead showing renewed buying intent (hot) is not
+ * pulled back into the cold bucket just because an old cold tag is still
+ * present. To move a lead back to cold, remove the hot tag in GoHighLevel.
  */
 export const STATE_PRIORITY: Record<StateName, number> = {
   active: 0,
-  cold: 1,
-  hot: 2,
+  hot: 1,
+  cold: 2,
 };
 
 export interface LineState {
@@ -117,8 +120,9 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
           matchers: ['auto - autoquote click', 'autoquote click', 'autoquote'],
           bucketId: autoHot,
           tag: 'Auto Hot lead',
-          removeBucketIds: [],
-          removeTags: [],
+          // Leads can move cold <-> hot, so going hot removes the cold bucket/tag.
+          removeBucketIds: [autoCold],
+          removeTags: ['Auto Cold lead'],
           isCustomer: false,
         },
         {
@@ -181,7 +185,7 @@ export interface LineMatch {
  * Determine which insurance line + state a set of GoHighLevel tags maps to.
  *
  * If multiple states match (e.g. accumulated tags), the highest priority state
- * wins (active > cold > hot). Ties are broken by line order, so Auto beats ACA.
+ * wins (active > hot > cold). Ties are broken by line order, so Auto beats ACA.
  */
 export function matchInsuranceLine(
   tags: string[],

@@ -9,12 +9,13 @@ function match(tags: string[]) {
 }
 
 describe('Auto Insurance routing', () => {
-  it('routes "auto – autoquote click" to the Auto Hot Leads bucket', () => {
-    expect(match(['auto – autoquote click'])).toEqual({
-      line: 'auto',
-      state: 'hot',
-      bucket: '11879',
-    });
+  it('routes "auto – autoquote click" to the Auto Hot Leads bucket and removes Cold', () => {
+    const m = matchInsuranceLine(['auto – autoquote click'], lines)!;
+    expect(m.line.key).toBe('auto');
+    expect(m.state.name).toBe('hot');
+    expect(m.state.bucketId).toBe('11879');
+    expect(m.state.removeBucketIds).toContain('11880');
+    expect(m.state.removeTags).toContain('Auto Cold lead');
   });
 
   it('routes "cold_lead_auto" to the Auto Cold Leads bucket and removes Hot', () => {
@@ -36,9 +37,9 @@ describe('Auto Insurance routing', () => {
     expect(m.state.removeTags).toEqual(expect.arrayContaining(['Auto Cold lead', 'Auto Hot lead']));
   });
 
-  it('prefers cold over hot when both tags are present (cold wins)', () => {
-    // A lead that was hot, then tagged cold, should land in Cold (and removes Hot)
-    expect(match(['auto – autoquote click', 'cold_lead_auto'])?.state).toBe('cold');
+  it('prefers hot over cold when both tags are present (re-engagement wins)', () => {
+    // A cold lead showing renewed buying intent should land in Hot (removes Cold)
+    expect(match(['cold_lead_auto', 'auto – autoquote click'])?.state).toBe('hot');
   });
 
   it('prefers active over everything when all tags are present', () => {

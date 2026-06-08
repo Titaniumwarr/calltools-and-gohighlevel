@@ -15,9 +15,13 @@ These are the exact rules implemented for Auto:
 
 | GoHighLevel tag added | CallTools bucket added to | Removed from |
 |-----------------------|---------------------------|--------------|
-| `auto – autoquote click` | **Auto Insurance Hot Leads** (`11879`) | — |
+| `auto – autoquote click` | **Auto Insurance Hot Leads** (`11879`) | Cold Leads (`11880`) |
 | `cold_lead_auto` | **Auto Insurance Cold Leads** (`11880`) | Hot Leads (`11879`) |
 | `auto – active` | **Auto Active Clients** (`11881`) | Cold Leads (`11880`) + Hot Leads (`11879`) |
+
+Cold and Hot are mutually exclusive — a lead can move **cold ↔ hot** freely (e.g.
+a cold lead that shows renewed buying intent becomes hot and leaves the cold
+bucket), and going active leaves both.
 
 The matching tag also gets a CallTools tag applied (`Auto Hot lead`,
 `Auto Cold lead`, `Auto Active client`) and the removed-bucket tags are stripped.
@@ -41,12 +45,16 @@ collapsed) and inspected by `matchInsuranceLine()`. Each line declares states
 with the tags that trigger them and the buckets/tags to add and remove.
 
 If a contact has accumulated multiple matching tags, the **highest priority
-state wins**, in the order **active > cold > hot** (ties broken by line order,
-so Auto beats ACA). Practical effect:
+state wins**, in the order **active > hot > cold** (ties broken by line order,
+so Auto beats ACA). Hot beats cold so a lead showing renewed buying intent is
+not dragged back to the cold bucket by a stale cold tag. Practical effect:
 
-- `auto – autoquote click` only → **Hot**.
-- later tagged `cold_lead_auto` (now has both) → **Cold**, and removed from Hot.
-- later tagged `auto – active` (now has all three) → **Active**, removed from Cold + Hot.
+- `cold_lead_auto` only → **Cold**.
+- later tagged `auto – autoquote click` (renewed intent) → **Hot**, removed from Cold.
+- later tagged `auto – active` → **Active**, removed from Cold + Hot.
+
+To move a lead from hot back to cold, remove the `auto – autoquote click` tag in
+GoHighLevel (or have your workflow remove it) when adding `cold_lead_auto`.
 
 Contacts tagged with generic `customer` / `won` / `purchased` (and not matched
 as an active state) are marked as customers and skipped.
@@ -67,6 +75,7 @@ words like `cold` that the ACA line also matches.
 **`auto – autoquote click` (hot lead):**
 - Creates/updates the contact in CallTools
 - Adds it to the **Auto Insurance Hot Leads** bucket (`11879`)
+- Removes it from the **Cold Leads** bucket (`11880`) and removes the `Auto Cold lead` tag
 - Applies the **`Auto Hot lead`** tag
 
 **`cold_lead_auto` (cold lead):**
