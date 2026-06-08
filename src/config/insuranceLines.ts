@@ -18,21 +18,25 @@
  * priority.
  */
 
-export type StateName = 'cold' | 'hot' | 'active';
+export type StateName = 'cold' | 'hot' | 'active' | 'winback';
 
 /**
  * Detection/priority ordering when a contact matches more than one state.
  * Lower number = higher priority. A contact that has accumulated several tags
- * resolves to the highest priority state, so: active > hot > cold.
+ * resolves to the highest priority state, so: active > winback > hot > cold.
  *
- * Hot beats cold so that a lead showing renewed buying intent (hot) is not
- * pulled back into the cold bucket just because an old cold tag is still
- * present. To move a lead back to cold, remove the hot tag in GoHighLevel.
+ * - Active is highest: a sold client stays sold.
+ * - Winback (lapsed/cancelled client to re-pursue) outranks cold/hot leads.
+ * - Hot beats cold so renewed buying intent isn't pulled back into cold.
+ *
+ * To move a contact down a state, remove the higher state's tag in
+ * GoHighLevel (e.g. remove the active tag when tagging a contact for winback).
  */
 export const STATE_PRIORITY: Record<StateName, number> = {
   active: 0,
-  hot: 1,
-  cold: 2,
+  winback: 1,
+  hot: 2,
+  cold: 3,
 };
 
 export interface LineState {
@@ -53,6 +57,12 @@ export interface LineState {
   removeTags: string[];
   /** Whether reaching this state marks the contact as a customer (excluded from cold syncs). */
   isCustomer: boolean;
+  /**
+   * When true, this state is applied even if the contact is already a known
+   * customer, and it resets the customer flag. Used for winback (re-pursuing a
+   * lapsed/cancelled client who was previously an active customer).
+   */
+  overridesCustomer?: boolean;
 }
 
 export interface InsuranceLineConfig {
@@ -72,6 +82,7 @@ export interface InsuranceLineConfig {
 export interface InsuranceLineEnv {
   ACA_COLD_LEADS_BUCKET_ID?: string;
   ACA_ACTIVE_CLIENTS_BUCKET_ID?: string;
+  ACA_WINBACK_BUCKET_ID?: string;
   AUTO_COLD_LEADS_BUCKET_ID?: string;
   AUTO_HOT_LEADS_BUCKET_ID?: string;
   AUTO_ACTIVE_CLIENTS_BUCKET_ID?: string;
@@ -108,6 +119,7 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
 
   const acaCold = pick(env.ACA_COLD_LEADS_BUCKET_ID, '11237');
   const acaActive = pick(env.ACA_ACTIVE_CLIENTS_BUCKET_ID, '11252');
+  const acaWinback = pick(env.ACA_WINBACK_BUCKET_ID, '11238');
 
   return [
     {
@@ -183,9 +195,26 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
           bucketId: acaActive,
           // CallTools tag (id 129315)
           tag: 'ACA Active Client',
-          removeBucketIds: [acaCold],
-          removeTags: ['ACA Cold Lead'],
+          // A re-sold client leaves the cold and winback buckets/tags.
+          removeBucketIds: [acaCold, acaWinback],
+          removeTags: ['ACA Cold Lead', 'winback – aca'],
           isCustomer: true,
+        },
+        {
+          name: 'winback',
+          // GHL trigger tag: "winback – aca" (lapsed/cancelled ACA client to re-pursue)
+          matchers: ['winback - aca', 'winback aca'],
+          bucketId: acaWinback,
+          // CallTools tag (id 132076) - note the en-dash to match the existing tag
+          tag: 'winback – aca',
+          // Past clients leave the cold + active buckets/tags so they only sit
+          // in the Win-Back queue.
+          removeBucketIds: [acaCold, acaActive],
+          removeTags: ['ACA Cold Lead', 'ACA Active Client'],
+          // Not a customer (we want to call them to re-sell), and override the
+          // existing customer flag set while they were an active client.
+          isCustomer: false,
+          overridesCustomer: true,
         },
       ],
     },

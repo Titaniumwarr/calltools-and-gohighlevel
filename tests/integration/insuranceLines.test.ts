@@ -88,4 +88,22 @@ describe('ACA Insurance routing (unchanged)', () => {
   it('returns null when no insurance tag is present', () => {
     expect(match(['random tag', 'newsletter'])).toBeNull();
   });
+
+  it('routes "winback – aca" to the Win-Back bucket with the winback tag', () => {
+    const m = matchInsuranceLine(['winback – aca'], lines)!;
+    expect(m.line.key).toBe('aca');
+    expect(m.state.name).toBe('winback');
+    expect(m.state.bucketId).toBe('11238');
+    expect(m.state.tag).toBe('winback – aca');
+    expect(m.state.isCustomer).toBe(false);
+    expect(m.state.overridesCustomer).toBe(true);
+    expect(m.state.removeBucketIds).toEqual(expect.arrayContaining(['11237', '11252']));
+    expect(m.state.removeTags).toEqual(
+      expect.arrayContaining(['ACA Cold Lead', 'ACA Active Client'])
+    );
+  });
+
+  it('prefers active over winback when both tags are present (re-sold wins)', () => {
+    expect(match(['winback – aca', 'aca active 2026'])?.state).toBe('active');
+  });
 });

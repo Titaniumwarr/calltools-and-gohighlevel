@@ -112,7 +112,13 @@ export class ContactSyncService {
         );
       });
 
-      if (match && match.state.name !== 'active' && looksLikeCustomer) {
+      // Cold/hot states are blocked if the contact looks like a customer.
+      // Active and winback states are exempt (winback deliberately re-pursues
+      // past customers).
+      const stateExemptFromCustomerCheck =
+        !!match && (match.state.isCustomer || !!match.state.overridesCustomer);
+
+      if (match && !stateExemptFromCustomerCheck && looksLikeCustomer) {
         console.log(`Contact ${ghlContactId} excluded: matched ${match.state.name} but has customer/client tags`);
         await this.markAsCustomer(ghlContactId);
         return { success: true, contact_id: ghlContactId, action: 'excluded', bucket_id: null };
@@ -186,8 +192,9 @@ export class ContactSyncService {
         };
       }
 
-      // Don't re-add a known customer to a non-customer (cold/hot) bucket.
-      if (!state.isCustomer) {
+      // Don't re-add a known customer to a non-customer (cold/hot) bucket,
+      // unless the state explicitly overrides this (e.g. winback).
+      if (!state.isCustomer && !state.overridesCustomer) {
         const existingRecord = await this.getSyncedContact(ghlContact.id);
         if (existingRecord && existingRecord.is_customer === 1) {
           console.log(`Contact ${ghlContact.id} is a known customer, skipping ${state.name} sync`);
@@ -352,12 +359,14 @@ export class ContactSyncService {
           continue; // Doesn't match any insurance line state
         }
 
-        // Skip generic customers (won/purchased) that aren't an active match
+        // Skip generic customers (won/purchased) unless the matched state is a
+        // customer state (active) or overrides the customer flag (winback).
         const looksLikeCustomer = tags.some((raw) => {
           const tag = raw.toLowerCase();
           return tag.includes('customer') || tag.includes('won') || tag.includes('purchased');
         });
-        if (match.state.name !== 'active' && looksLikeCustomer) {
+        const stateExemptFromCustomerCheck = match.state.isCustomer || !!match.state.overridesCustomer;
+        if (!stateExemptFromCustomerCheck && looksLikeCustomer) {
           result.excluded_customers++;
           await this.markAsCustomer(ghlContact.id);
           continue;
