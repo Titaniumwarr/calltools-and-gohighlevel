@@ -23,8 +23,15 @@ Cold and Hot are mutually exclusive — a lead can move **cold ↔ hot** freely 
 a cold lead that shows renewed buying intent becomes hot and leaves the cold
 bucket), and going active leaves both.
 
-The matching tag also gets a CallTools tag applied (`Auto Hot lead`,
-`Auto Cold lead`, `Auto Active client`) and the removed-bucket tags are stripped.
+The matching tag also gets a CallTools tag applied and the removed-bucket tags
+are stripped. The CallTools tags (and their tag IDs) are:
+
+| State | CallTools tag | Tag ID |
+|-------|---------------|--------|
+| Hot | `Auto Insurance Hot Leads` | `142724` |
+| Cold | `Auto Insurance Cold Leads` | `142725` |
+| Active | `auto – active` | `142754` |
+
 Only `auto – active` marks the contact as a customer.
 
 ### CallTools buckets
@@ -33,9 +40,9 @@ Only `auto – active` marks the contact as a customer.
 |------|-------|--------|-----------|---------------|
 | ACA / Health | Cold | `ACA_COLD_LEADS_BUCKET_ID` | `11237` | `ACA Cold lead` |
 | ACA / Health | Active | `ACA_ACTIVE_CLIENTS_BUCKET_ID` | `11252` | `ACA Active client` |
-| Auto | Hot | `AUTO_HOT_LEADS_BUCKET_ID` | `11879` (Auto Insurance Hot Leads) | `Auto Hot lead` |
-| Auto | Cold | `AUTO_COLD_LEADS_BUCKET_ID` | `11880` (Auto Insurance Cold Leads) | `Auto Cold lead` |
-| Auto | Active | `AUTO_ACTIVE_CLIENTS_BUCKET_ID` | `11881` (Auto Active Clients) | `Auto Active client` |
+| Auto | Hot | `AUTO_HOT_LEADS_BUCKET_ID` | `11879` (Auto Insurance Hot Leads) | `Auto Insurance Hot Leads` (142724) |
+| Auto | Cold | `AUTO_COLD_LEADS_BUCKET_ID` | `11880` (Auto Insurance Cold Leads) | `Auto Insurance Cold Leads` (142725) |
+| Auto | Active | `AUTO_ACTIVE_CLIENTS_BUCKET_ID` | `11881` (Auto Active Clients) | `auto – active` (142754) |
 
 ## How a contact is routed
 
@@ -64,10 +71,10 @@ words like `cold` that the ACA line also matches.
 
 ### GoHighLevel tags that trigger the Auto line
 
-| State | GoHighLevel tags (case / dash / spacing insensitive) |
-|-------|------------------------------------------------------|
-| Auto hot lead | `auto – autoquote click` (also `autoquote click`, `autoquote`) |
-| Auto cold lead | `cold_lead_auto` |
+| State | GoHighLevel trigger tags (case / dash / spacing insensitive) |
+|-------|--------------------------------------------------------------|
+| Auto hot lead | `auto – autoquote click`, `Auto Insurance Hot Leads` (also `autoquote click`, `autoquote`) |
+| Auto cold lead | `cold_lead_auto`, `Auto Insurance Cold Leads` |
 | Auto active client | `auto – active` (also `auto active`, `auto active 2025/2026`, `auto active client`) |
 
 ### What happens in CallTools
@@ -75,20 +82,20 @@ words like `cold` that the ACA line also matches.
 **`auto – autoquote click` (hot lead):**
 - Creates/updates the contact in CallTools
 - Adds it to the **Auto Insurance Hot Leads** bucket (`11879`)
-- Removes it from the **Cold Leads** bucket (`11880`) and removes the `Auto Cold lead` tag
-- Applies the **`Auto Hot lead`** tag
+- Removes it from the **Cold Leads** bucket (`11880`) and removes the `Auto Insurance Cold Leads` tag
+- Applies the **`Auto Insurance Hot Leads`** tag (142724)
 
 **`cold_lead_auto` (cold lead):**
 - Creates/updates the contact in CallTools
 - Adds it to the **Auto Insurance Cold Leads** bucket (`11880`)
-- Removes it from the **Hot Leads** bucket (`11879`) and removes the `Auto Hot lead` tag
-- Applies the **`Auto Cold lead`** tag
+- Removes it from the **Hot Leads** bucket (`11879`) and removes the `Auto Insurance Hot Leads` tag
+- Applies the **`Auto Insurance Cold Leads`** tag (142725)
 
 **`auto – active` (active client):**
 - Creates/updates the contact in CallTools
 - Adds it to the **Auto Active Clients** bucket (`11881`)
 - Removes it from the **Cold Leads** (`11880`) and **Hot Leads** (`11879`) buckets and removes their tags
-- Applies the **`Auto Active client`** tag
+- Applies the **`auto – active`** tag (142754)
 - Marks the contact as a customer in the database
 
 ## Configuration

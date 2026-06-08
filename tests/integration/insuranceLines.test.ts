@@ -14,8 +14,13 @@ describe('Auto Insurance routing', () => {
     expect(m.line.key).toBe('auto');
     expect(m.state.name).toBe('hot');
     expect(m.state.bucketId).toBe('11879');
+    expect(m.state.tag).toBe('Auto Insurance Hot Leads');
     expect(m.state.removeBucketIds).toContain('11880');
-    expect(m.state.removeTags).toContain('Auto Cold lead');
+    expect(m.state.removeTags).toContain('Auto Insurance Cold Leads');
+  });
+
+  it('routes the "Auto Insurance Hot Leads" tag to the Hot bucket', () => {
+    expect(match(['Auto Insurance Hot Leads'])?.state).toBe('hot');
   });
 
   it('routes "cold_lead_auto" to the Auto Cold Leads bucket and removes Hot', () => {
@@ -23,8 +28,13 @@ describe('Auto Insurance routing', () => {
     expect(m.line.key).toBe('auto');
     expect(m.state.name).toBe('cold');
     expect(m.state.bucketId).toBe('11880');
+    expect(m.state.tag).toBe('Auto Insurance Cold Leads');
     expect(m.state.removeBucketIds).toContain('11879');
-    expect(m.state.removeTags).toContain('Auto Hot lead');
+    expect(m.state.removeTags).toContain('Auto Insurance Hot Leads');
+  });
+
+  it('routes the "Auto Insurance Cold Leads" tag to the Cold bucket', () => {
+    expect(match(['Auto Insurance Cold Leads'])?.state).toBe('cold');
   });
 
   it('routes "auto – active" to the Auto Active Clients bucket and removes Cold + Hot', () => {
@@ -32,9 +42,12 @@ describe('Auto Insurance routing', () => {
     expect(m.line.key).toBe('auto');
     expect(m.state.name).toBe('active');
     expect(m.state.bucketId).toBe('11881');
+    expect(m.state.tag).toBe('auto – active');
     expect(m.state.isCustomer).toBe(true);
     expect(m.state.removeBucketIds).toEqual(expect.arrayContaining(['11880', '11879']));
-    expect(m.state.removeTags).toEqual(expect.arrayContaining(['Auto Cold lead', 'Auto Hot lead']));
+    expect(m.state.removeTags).toEqual(
+      expect.arrayContaining(['Auto Insurance Cold Leads', 'Auto Insurance Hot Leads'])
+    );
   });
 
   it('prefers hot over cold when both tags are present (re-engagement wins)', () => {

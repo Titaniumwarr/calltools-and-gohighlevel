@@ -116,35 +116,49 @@ export function getInsuranceLines(env: InsuranceLineEnv): InsuranceLineConfig[] 
       states: [
         {
           name: 'hot',
-          // GHL tag: "auto – autoquote click"
-          matchers: ['auto - autoquote click', 'autoquote click', 'autoquote'],
+          // GHL trigger tag(s): "auto – autoquote click" or "Auto Insurance Hot Leads"
+          matchers: [
+            'auto - autoquote click',
+            'autoquote click',
+            'autoquote',
+            'auto insurance hot leads',
+            'auto insurance hot',
+          ],
           bucketId: autoHot,
-          tag: 'Auto Hot lead',
+          // CallTools tag (id 142724)
+          tag: 'Auto Insurance Hot Leads',
           // Leads can move cold <-> hot, so going hot removes the cold bucket/tag.
           removeBucketIds: [autoCold],
-          removeTags: ['Auto Cold lead'],
+          removeTags: ['Auto Insurance Cold Leads'],
           isCustomer: false,
         },
         {
           name: 'cold',
-          // GHL tag: "cold_lead_auto"
-          matchers: ['cold_lead_auto', 'cold lead auto'],
+          // GHL trigger tag(s): "cold_lead_auto" or "Auto Insurance Cold Leads"
+          matchers: [
+            'cold_lead_auto',
+            'cold lead auto',
+            'auto insurance cold leads',
+            'auto insurance cold',
+          ],
           bucketId: autoCold,
-          tag: 'Auto Cold lead',
+          // CallTools tag (id 142725)
+          tag: 'Auto Insurance Cold Leads',
           // Adding to cold removes the contact from the hot bucket/tag.
           removeBucketIds: [autoHot],
-          removeTags: ['Auto Hot lead'],
+          removeTags: ['Auto Insurance Hot Leads'],
           isCustomer: false,
         },
         {
           name: 'active',
-          // GHL tag: "auto – active"
+          // GHL trigger tag: "auto – active"
           matchers: ['auto - active', 'auto active', 'auto active client', 'auto active 2025', 'auto active 2026'],
           bucketId: autoActive,
-          tag: 'Auto Active client',
+          // CallTools tag (id 142754) - note the en-dash to match the existing tag
+          tag: 'auto – active',
           // Active removes the contact from both cold and hot.
           removeBucketIds: [autoCold, autoHot],
-          removeTags: ['Auto Cold lead', 'Auto Hot lead'],
+          removeTags: ['Auto Insurance Cold Leads', 'Auto Insurance Hot Leads'],
           isCustomer: true,
         },
       ],
